@@ -13,6 +13,7 @@ Route::view('/pos', 'pos-checkout');
 Route::prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
     Route::post('/checkout', [POSApiController::class, 'checkout']);
+    Route::post('/mpesa-verify', [POSApiController::class, 'verifyMpesaTransaction']);
     Route::post('/void-sale', [POSApiController::class, 'voidSale'])
         ->middleware('RequireManagerPin');
 });

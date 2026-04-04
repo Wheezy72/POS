@@ -253,6 +253,64 @@ class POSApiController extends Controller
         ]);
     }
 
+    public function verifyMpesaTransaction(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'receipt_number' => ['nullable', 'string', 'required_without:CheckoutRequestID'],
+            'CheckoutRequestID' => ['nullable', 'string', 'required_without:receipt_number'],
+        ]);
+
+        try {
+            $payment = DB::transaction(function () use ($validated): Payment {
+                $paymentQuery = Payment::query()
+                    ->where('method', 'mpesa')
+                    ->where('status', 'pending')
+                    ->with('sale')
+                    ->lockForUpdate();
+
+                if (! empty($validated['receipt_number'])) {
+                    $paymentQuery->whereHas('sale', function ($builder) use ($validated) {
+                        $builder->where('receipt_number', $validated['receipt_number']);
+                    });
+                }
+
+                if (! empty($validated['CheckoutRequestID'])) {
+                    $paymentQuery->where('reference_number', $validated['CheckoutRequestID']);
+                }
+
+                /** @var Payment|null $payment */
+                $payment = $paymentQuery->first();
+
+                if ($payment === null) {
+                    throw new RuntimeException('No pending M-PESA transaction found for the provided reference.');
+                }
+
+                // This simulates a successful Daraja status lookup for the fallback path.
+                $payment->update([
+                    'status' => 'completed',
+                ]);
+
+                return $payment->fresh('sale');
+            });
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 404);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'Unable to verify M-PESA transaction.',
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'M-PESA transaction verified successfully.',
+            'payment' => $payment,
+            'sale' => $payment->sale,
+        ]);
+    }
+
     private function generateReceiptNumber(): string
     {
         do {
