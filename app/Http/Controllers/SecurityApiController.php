@@ -51,6 +51,7 @@ class SecurityApiController extends Controller
         return response()->json([
             'message' => 'PIN login successful.',
             'session_authenticated' => true,
+            'csrf_token' => $request->session()->token(),
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
