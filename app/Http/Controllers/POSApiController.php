@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Jobs\SyncSaleToCloud;
+use App\Models\IncomingMpesaPayment;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
@@ -49,6 +50,7 @@ class POSApiController extends Controller
         $validated = $request->validate([
             'customer_id' => ['nullable', 'uuid'],
             'manager_pin' => ['nullable', 'string', 'regex:/^\d{4}(\d{2})?$/'],
+            'claim_transaction_code' => ['nullable', 'string', 'max:255'],
             'cart' => ['required', 'array', 'min:1'],
             'cart.*.product_id' => ['required', 'uuid'],
             'cart.*.quantity' => ['required', 'numeric', 'gt:0'],
@@ -71,6 +73,20 @@ class POSApiController extends Controller
 
         try {
             $sale = DB::transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
+                $claimedIncomingPayment = null;
+
+                if (! empty($validated['claim_transaction_code'])) {
+                    $claimedIncomingPayment = IncomingMpesaPayment::query()
+                        ->where('transaction_code', $validated['claim_transaction_code'])
+                        ->where('status', 'pending')
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($claimedIncomingPayment === null) {
+                        throw new RuntimeException('The supplied M-PESA transaction code is unavailable or already claimed.');
+                    }
+                }
+
                 $productIds = collect($validated['cart'])
                     ->pluck('product_id')
                     ->unique()
@@ -178,6 +194,12 @@ class POSApiController extends Controller
                     throw new RuntimeException('Split payment total must equal the grand total.');
                 }
 
+                if ($claimedIncomingPayment !== null && ! collect($normalizedPayments)->contains(
+                    fn (array $payment): bool => $payment['method'] === 'mpesa'
+                )) {
+                    throw new RuntimeException('A claimed M-PESA transaction must be attached to an M-PESA payment line.');
+                }
+
                 $sale = Sale::query()->create([
                     'user_id' => $cashierId,
                     'customer_id' => $validated['customer_id'] ?? null,
@@ -202,13 +224,33 @@ class POSApiController extends Controller
                     $lineItem['product']->decrement('stock_quantity', $lineItem['quantity']);
                 }
 
+                $mpesaClaimAttached = false;
+
                 foreach ($normalizedPayments as $paymentData) {
+                    $referenceNumber = $paymentData['reference_number'] ?? null;
+
+                    if (
+                        $claimedIncomingPayment !== null &&
+                        ! $mpesaClaimAttached &&
+                        $paymentData['method'] === 'mpesa'
+                    ) {
+                        $referenceNumber = $claimedIncomingPayment->transaction_code;
+                        $mpesaClaimAttached = true;
+                    }
+
                     Payment::query()->create([
                         'sale_id' => $sale->id,
                         'method' => $paymentData['method'],
                         'amount' => round((float) $paymentData['amount'], 2),
-                        'reference_number' => $paymentData['reference_number'] ?? null,
+                        'reference_number' => $referenceNumber,
                         'status' => $paymentData['status'] ?? 'completed',
+                    ]);
+                }
+
+                if ($claimedIncomingPayment !== null) {
+                    $claimedIncomingPayment->update([
+                        'status' => 'claimed',
+                        'claimed_at' => now(),
                     ]);
                 }
 

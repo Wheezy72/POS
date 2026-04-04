@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\AdminApiController;
+use App\Http\Controllers\PaymentApiController;
 use App\Http\Controllers\POSApiController;
 use App\Http\Controllers\SecurityApiController;
 use Illuminate\Support\Facades\Route;
@@ -13,10 +14,15 @@ Route::view('/pos', 'pos-checkout');
 Route::prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
     Route::post('/checkout', [POSApiController::class, 'checkout']);
+    Route::get('/mpesa/live-feed', [PaymentApiController::class, 'liveFeed']);
+    Route::post('/mpesa/stk-push', [PaymentApiController::class, 'stkPush']);
+    Route::post('/mpesa/stk-status', [PaymentApiController::class, 'stkStatus']);
     Route::post('/mpesa-verify', [POSApiController::class, 'verifyMpesaTransaction']);
     Route::post('/void-sale', [POSApiController::class, 'voidSale'])
         ->middleware('RequireManagerPin');
 });
+
+Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
 
 Route::prefix('api/auth')->group(function (): void {
     Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
