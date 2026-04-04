@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'welcome');
 Route::view('/pos', 'pos-checkout');
 
-Route::prefix('api/pos')->group(function (): void {
+Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
     Route::post('/checkout', [POSApiController::class, 'checkout']);
     Route::get('/mpesa/live-feed', [PaymentApiController::class, 'liveFeed']);
@@ -23,7 +23,7 @@ Route::prefix('api/pos')->group(function (): void {
 });
 
 Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
-Route::post('/api/login-pin', [SecurityApiController::class, 'pinLogin'])
+Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin'])
     ->middleware('throttle:pin-login');
 
 Route::prefix('api/auth')->group(function (): void {

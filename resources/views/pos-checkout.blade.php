@@ -3,11 +3,14 @@
 @php
     /** @var \App\Models\User|null $authUser */
     $authUser = auth()->user();
-    $initialUser = $authUser ? [
+    $initialUser = $authUser !== null && $authUser->role === 'cashier' ? [
         'id' => (string) $authUser->getAuthIdentifier(),
         'name' => $authUser->name,
         'role' => $authUser->role,
     ] : null;
+    $initialBlockedRole = $authUser !== null && $authUser->role !== 'cashier'
+        ? $authUser->role
+        : null;
 @endphp
 <head>
     <meta charset="UTF-8">
@@ -91,11 +94,18 @@
         x-data="posConsole({
             authenticated: @js($initialUser !== null),
             user: @js($initialUser),
+            blockedRole: @js($initialBlockedRole),
         })"
         x-init="boot()"
         @keydown.window="handleGlobalKeydown($event)"
         class="relative min-h-screen"
     >
+        <div class="pointer-events-none fixed inset-0 overflow-hidden">
+            <div class="absolute -left-24 top-0 h-72 w-72 rounded-full bg-emerald-300/30 blur-3xl dark:bg-emerald-500/10"></div>
+            <div class="absolute right-0 top-24 h-96 w-96 rounded-full bg-sky-200/40 blur-3xl dark:bg-cyan-500/10"></div>
+            <div class="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-violet-200/35 blur-3xl dark:bg-violet-500/10"></div>
+        </div>
+
         <div class="pointer-events-none fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-3 sm:right-6 sm:top-6">
             <template x-for="toast in toasts" :key="toast.id">
                 <div
@@ -147,39 +157,42 @@
         </div>
 
         <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
-            <header class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
-                <div class="flex flex-col gap-6 px-5 py-5 lg:px-6 lg:py-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                        <div class="space-y-2">
-                            <div class="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                Premium Retail Console
+            <header class="overflow-hidden rounded-[28px] border border-white/70 bg-white/90 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95">
+                <div class="border-b border-slate-200/80 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-700 px-5 py-5 text-white dark:border-slate-800 lg:px-6 lg:py-6">
+                    <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+                        <div class="space-y-3">
+                            <div class="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
+                                Enterprise Retail Console
                             </div>
                             <div>
-                                <h1 class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Duka-App POS</h1>
-                                <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
-                                    Fast checkout, margin-safe pricing, and live M-PESA capture in one operator-first console.
+                                <h1 class="text-4xl font-semibold tracking-tight">Duka-App POS</h1>
+                                <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-200">
+                                    Faster cashier flow, stronger visual hierarchy, and a proper operator console instead of a generic admin screen.
                                 </p>
                             </div>
                         </div>
 
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Cashier session</p>
-                                <div class="mt-1 flex items-center gap-3">
-                                    <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                            <div class="min-w-[19rem] rounded-[24px] border border-white/10 bg-white/10 px-4 py-4 shadow-sm backdrop-blur">
+                                <div class="flex items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-100/80">Logged in operator</p>
+                                        <p class="mt-2 text-lg font-semibold" x-text="user ? user.name : 'Register locked'"></p>
+                                        <p class="mt-1 text-xs uppercase tracking-[0.18em] text-slate-300" x-text="user ? user.role : 'cashier required'"></p>
+                                    </div>
+                                    <div class="flex h-14 w-14 items-center justify-center rounded-[20px] bg-emerald-400/20 text-lg font-semibold text-white ring-1 ring-white/10">
                                         <span x-text="user ? user.name.charAt(0) : '—'"></span>
                                     </div>
-                                    <div>
-                                        <p class="text-sm font-semibold text-slate-900 dark:text-white" x-text="user ? user.name : 'Awaiting sign in'"></p>
-                                        <p class="text-xs uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400" x-text="user ? user.role : 'locked'"></p>
-                                    </div>
+                                </div>
+                                <div class="mt-4 rounded-2xl bg-black/15 px-3 py-3 text-xs font-medium text-slate-200">
+                                    Cashier-only register. Admin stays out of checkout and uses approvals/reports instead.
                                 </div>
                             </div>
 
                             <button
                                 type="button"
                                 @click="toggleTheme()"
-                                class="inline-flex h-14 items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+                                class="inline-flex h-auto min-h-14 items-center justify-center gap-3 rounded-[24px] border border-white/10 bg-white/10 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-white/15"
                                 :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
                             >
                                 <svg x-show="!isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -188,11 +201,20 @@
                                 <svg x-show="isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 12.79A9 9 0 1 1 11.21 3c-.11.57-.17 1.15-.17 1.75a9 9 0 0 0 9.21 9.04c.58 0 1.16-.06 1.75-.17Z" />
                                 </svg>
-                                <span x-text="isDark ? 'Light mode' : 'Dark mode'"></span>
+                                <span x-text="isDark ? 'Switch to daylight' : 'Switch to dark mode'"></span>
                             </button>
                         </div>
                     </div>
 
+                    <div class="mt-6 flex flex-wrap gap-2">
+                        <button type="button" @click="scrollToSection('catalogSection')" class="inline-flex h-10 items-center rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/15">Catalog</button>
+                        <button type="button" @click="scrollToSection('cartSection')" class="inline-flex h-10 items-center rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/15">Cart</button>
+                        <button type="button" @click="openCheckoutModal()" class="inline-flex h-10 items-center rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/15">Payment</button>
+                        <button type="button" @click="scrollToSection('liveFeedSection')" class="inline-flex h-10 items-center rounded-2xl border border-white/10 bg-white/10 px-4 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-white/15">Till feed</button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-6 px-5 py-5 lg:px-6 lg:py-6">
                     <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
                         <div class="space-y-4">
                             <div class="relative">
@@ -250,16 +272,16 @@
                         </div>
 
                         <div class="grid gap-3 sm:grid-cols-3 xl:w-[28rem]">
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Status</p>
+                            <div class="rounded-[24px] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white px-4 py-4 shadow-sm dark:border-emerald-500/20 dark:bg-gradient-to-br dark:from-emerald-500/10 dark:to-slate-900">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-300">Status</p>
                                 <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white" x-text="statusMessage"></p>
                             </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Items</p>
+                            <div class="rounded-[24px] border border-sky-200 bg-gradient-to-br from-sky-50 to-white px-4 py-4 shadow-sm dark:border-sky-500/20 dark:bg-gradient-to-br dark:from-sky-500/10 dark:to-slate-900">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700 dark:text-sky-300">Items</p>
                                 <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white" x-text="totalItems"></p>
                             </div>
-                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
-                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Hotkeys</p>
+                            <div class="rounded-[24px] border border-violet-200 bg-gradient-to-br from-violet-50 to-white px-4 py-4 shadow-sm dark:border-violet-500/20 dark:bg-gradient-to-br dark:from-violet-500/10 dark:to-slate-900">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700 dark:text-violet-300">Flow</p>
                                 <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white">F2 Pay · F4 Void · F10 Park</p>
                             </div>
                         </div>
@@ -269,7 +291,7 @@
 
             <main class="grid flex-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_24rem]">
                 <div class="grid min-h-0 gap-6">
-                    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                    <section x-ref="catalogSection" class="rounded-[28px] border border-slate-200 bg-white/90 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95">
                         <div class="flex flex-col gap-4 px-5 py-5 lg:px-6">
                             <div class="flex items-center justify-between gap-4">
                                 <div>
@@ -304,7 +326,7 @@
                                                         <p class="truncate text-lg font-semibold text-slate-950 dark:text-white" x-text="product.name"></p>
                                                         <p class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500" x-text="product.sku"></p>
                                                     </div>
-                                                    <span class="rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-950" x-text="formatCurrency(product.base_price)"></span>
+                                                    <span class="rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-emerald-500 dark:text-white" x-text="formatCurrency(product.base_price)"></span>
                                                 </div>
 
                                                 <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
@@ -348,7 +370,7 @@
                     </section>
 
                     <section class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-                        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                        <div x-ref="cartSection" class="rounded-[28px] border border-slate-200 bg-white/90 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95">
                             <div class="flex h-full min-h-[24rem] flex-col">
                                 <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 lg:px-6">
                                     <div>
@@ -426,24 +448,24 @@
                             </div>
                         </div>
 
-                        <aside class="rounded-2xl bg-slate-950 p-5 text-white shadow-sm dark:bg-white dark:text-slate-950 lg:p-6">
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-white/60 dark:text-slate-500">Grand total</p>
+                        <aside class="rounded-[28px] bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 p-5 text-white shadow-sm ring-1 ring-emerald-400/30 lg:p-6">
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-white/70">Grand total</p>
                             <div class="mt-6">
                                 <p class="text-5xl font-semibold tracking-tight" x-text="formatCurrency(grandTotal)"></p>
-                                <p class="mt-2 text-sm text-white/70 dark:text-slate-500">Server-side pricing rules still apply on checkout, including expiry markdowns and margin protection.</p>
+                                <p class="mt-2 text-sm text-white/80">Server-side pricing rules still apply on checkout, including expiry markdowns and margin protection.</p>
                             </div>
 
                             <div class="mt-8 space-y-4">
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-white/60 dark:text-slate-500">Subtotal</span>
+                                    <span class="text-white/70">Subtotal</span>
                                     <span class="font-semibold" x-text="formatCurrency(subtotal)"></span>
                                 </div>
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-white/60 dark:text-slate-500">Tax</span>
+                                    <span class="text-white/70">Tax</span>
                                     <span class="font-semibold" x-text="formatCurrency(tax)"></span>
                                 </div>
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-white/60 dark:text-slate-500">Units</span>
+                                    <span class="text-white/70">Units</span>
                                     <span class="font-semibold" x-text="formatQuantity(totalItems)"></span>
                                 </div>
                             </div>
@@ -461,7 +483,7 @@
                                     type="button"
                                     @click="openManagerApproval()"
                                     :disabled="cart.length === 0 || isBusy"
-                                    class="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                                    class="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white/15 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:bg-white/5"
                                 >
                                     Void with manager approval
                                 </button>
@@ -469,7 +491,7 @@
                                     type="button"
                                     @click="parkCart()"
                                     :disabled="cart.length === 0 || isBusy"
-                                    class="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-white/15 bg-transparent text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-300 dark:text-slate-900 dark:hover:bg-slate-100"
+                                    class="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-white/20 bg-transparent text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     Park cart on this device
                                 </button>
@@ -478,8 +500,8 @@
                     </section>
                 </div>
 
-                <aside class="grid min-h-0 gap-6">
-                    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                <aside class="grid min-h-0 gap-6 xl:sticky xl:top-6 xl:self-start">
+                    <section x-ref="liveFeedSection" class="rounded-[28px] border border-slate-200 bg-white/90 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95">
                         <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                             <h2 class="text-lg font-semibold text-slate-950 dark:text-white">Live till feed</h2>
                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pending M-PESA deposits from the last 24 hours.</p>
@@ -524,7 +546,7 @@
                         </div>
                     </section>
 
-                    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                    <section class="rounded-[28px] border border-slate-200 bg-white/90 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-[#0f172a]/95">
                         <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
                             <h2 class="text-lg font-semibold text-slate-950 dark:text-white">Operator guidance</h2>
                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Minimal friction for the cashier, tight controls for the business.</p>
@@ -850,11 +872,17 @@
                     </div>
                     <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Unlock the register</h2>
                     <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                        This console is intentionally blocked until a staff session is active. Sign in with a cashier or admin PIN to begin trading.
+                        This register is cashier-only. Sign in with a cashier PIN to begin trading while admin and manager accounts remain available for approvals elsewhere.
                     </p>
                 </div>
 
                 <div class="grid gap-6 px-6 py-6">
+                    <template x-if="blockedRole">
+                        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                            A <span class="font-semibold" x-text="blockedRole"></span> session is already active in the browser, but that role cannot run the register. Use a cashier PIN instead.
+                        </div>
+                    </template>
+
                     <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
@@ -863,9 +891,9 @@
                                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">PIN: 0000</p>
                             </div>
                             <div>
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Admin demo</p>
-                                <p class="mt-2 text-sm font-semibold text-slate-950 dark:text-white">Admin Console</p>
-                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">PIN: 1234</p>
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Access rule</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-950 dark:text-white">Cashier only</p>
+                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Admin and manager stay on oversight flows, not checkout.</p>
                             </div>
                         </div>
                     </div>
@@ -890,7 +918,7 @@
                         :disabled="login.busy"
                         class="inline-flex h-14 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
                     >
-                        <span x-text="login.busy ? 'Signing in…' : 'Continue to console'"></span>
+                        <span x-text="login.busy ? 'Signing in…' : 'Continue as cashier'"></span>
                     </button>
                 </div>
             </div>
@@ -898,12 +926,17 @@
     </div>
 
     <script>
-        function posConsole({ authenticated, user }) {
+        function posConsole({ authenticated, user, blockedRole }) {
             return {
                 authenticated,
                 user,
+                blockedRole,
                 isDark: document.documentElement.classList.contains('dark'),
-                statusMessage: authenticated ? 'Cashier session active.' : 'Locked until staff PIN login.',
+                statusMessage: authenticated
+                    ? 'Cashier session active.'
+                    : blockedRole
+                        ? `Register locked for ${blockedRole} accounts.`
+                        : 'Locked until cashier PIN login.',
                 isBusy: false,
                 isSearching: false,
                 isSubmittingCheckout: false,
@@ -945,8 +978,10 @@
                 boot() {
                     this.cashTendered = this.roundMoney(this.grandTotal);
                     this.refreshCashPresets();
-                    this.fetchLivePayments();
-                    this.liveFeedTimer = window.setInterval(() => this.fetchLivePayments(), 5000);
+                    if (this.authenticated) {
+                        this.fetchLivePayments();
+                        this.liveFeedTimer = window.setInterval(() => this.fetchLivePayments(), 5000);
+                    }
 
                     this.$watch('grandTotal', () => {
                         this.refreshCashPresets();
@@ -960,6 +995,9 @@
                         if (this.authenticated) {
                             this.focusSearchInput();
                         } else {
+                            if (this.blockedRole) {
+                                this.toast('info', 'Cashier sign-in required', `${this.blockedRole} accounts can review the system but cannot operate the register.`);
+                            }
                             this.focusLoginInput();
                         }
                     });
@@ -1004,6 +1042,19 @@
                     this.isDark = !this.isDark;
                     document.documentElement.classList.toggle('dark', this.isDark);
                     localStorage.setItem('duka-theme', this.isDark ? 'dark' : 'light');
+                },
+
+                scrollToSection(sectionRef) {
+                    const element = this.$refs[sectionRef];
+
+                    if (!element) {
+                        return;
+                    }
+
+                    element.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                    });
                 },
 
                 handleGlobalKeydown(event) {
@@ -1098,6 +1149,7 @@
                 handleUnauthorized(payload) {
                     this.authenticated = false;
                     this.user = null;
+                    this.blockedRole = null;
                     this.showCheckoutModal = false;
                     this.managerApproval.show = false;
                     this.statusMessage = 'Session expired. Sign in again to continue.';
@@ -1146,11 +1198,17 @@
 
                         this.authenticated = true;
                         this.user = payload.user || null;
+                        this.blockedRole = null;
                         this.login.pin = '';
                         this.statusMessage = `Signed in as ${this.user?.name ?? 'staff'}.`;
 
                         if (payload.csrf_token) {
                             this.updateCsrfToken(payload.csrf_token);
+                        }
+
+                        if (!this.liveFeedTimer) {
+                            this.fetchLivePayments();
+                            this.liveFeedTimer = window.setInterval(() => this.fetchLivePayments(), 5000);
                         }
 
                         this.toast('success', 'Welcome back', payload.message || 'Cashier session activated.');

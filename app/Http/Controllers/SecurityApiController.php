@@ -20,44 +20,16 @@ class SecurityApiController extends Controller
 {
     public function pinLogin(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'pin' => ['required', 'string', 'regex:/^\d{4}(\d{2})?$/'],
-        ]);
+        return $this->authenticatePinLogin($request);
+    }
 
-        // PINs are stored as one-way hashes, so they cannot be queried directly.
-        // In a POS environment the active user list is typically small enough that
-        // verifying against the staff roster is acceptable and keeps the PIN secret at rest.
-        $user = $this->findUserByPin($validated['pin']);
-
-        if ($user === null) {
-            return response()->json([
-                'message' => 'Invalid credentials.',
-            ], 422);
-        }
-
-        // The routes are registered in web.php, so session authentication is a valid
-        // offline-friendly option even when the API is consumed by a local device.
-        Auth::login($user);
-        $request->session()->regenerate();
-        $request->session()->regenerateToken();
-
-        AuditLog::query()->create([
-            'user_id' => $user->id,
-            'action' => 'pin_login',
-            'description' => 'User authenticated via PIN login.',
-            'reference_id' => null,
-        ]);
-
-        return response()->json([
-            'message' => 'PIN login successful.',
-            'session_authenticated' => true,
-            'csrf_token' => $request->session()->token(),
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'role' => $user->role,
-            ],
-        ]);
+    public function posPinLogin(Request $request): JsonResponse
+    {
+        return $this->authenticatePinLogin(
+            $request,
+            ['cashier'],
+            'Only cashier accounts can open the POS register.'
+        );
     }
 
     public function managerOverride(Request $request): JsonResponse
@@ -272,5 +244,56 @@ class SecurityApiController extends Controller
         }
 
         return null;
+    }
+
+    private function authenticatePinLogin(
+        Request $request,
+        array $roles = [],
+        ?string $forbiddenMessage = null,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'pin' => ['required', 'string', 'regex:/^\d{4}(\d{2})?$/'],
+        ]);
+
+        // PINs are stored as one-way hashes, so they cannot be queried directly.
+        // In a POS environment the active user list is typically small enough that
+        // verifying against the staff roster is acceptable and keeps the PIN secret at rest.
+        $user = $this->findUserByPin($validated['pin']);
+
+        if ($user === null) {
+            return response()->json([
+                'message' => 'Invalid credentials.',
+            ], 422);
+        }
+
+        if ($roles !== [] && ! in_array($user->role, $roles, true)) {
+            return response()->json([
+                'message' => $forbiddenMessage ?? 'This account cannot access this workflow.',
+            ], 403);
+        }
+
+        // The routes are registered in web.php, so session authentication is a valid
+        // offline-friendly option even when the API is consumed by a local device.
+        Auth::login($user);
+        $request->session()->regenerate();
+        $request->session()->regenerateToken();
+
+        AuditLog::query()->create([
+            'user_id' => $user->id,
+            'action' => 'pin_login',
+            'description' => 'User authenticated via PIN login.',
+            'reference_id' => null,
+        ]);
+
+        return response()->json([
+            'message' => 'PIN login successful.',
+            'session_authenticated' => true,
+            'csrf_token' => $request->session()->token(),
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'role' => $user->role,
+            ],
+        ]);
     }
 }
