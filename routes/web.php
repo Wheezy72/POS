@@ -8,6 +8,7 @@ use App\Http\Controllers\SecurityApiController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
+Route::view('/pos', 'pos-checkout');
 
 Route::prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
