@@ -1,13 +1,56 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="h-full bg-slate-50">
+@php
+    /** @var \App\Models\User|null $authUser */
+    $authUser = auth()->user();
+    $initialUser = $authUser ? [
+        'id' => (string) $authUser->getAuthIdentifier(),
+        'name' => $authUser->name,
+        'role' => $authUser->role,
+    ] : null;
+@endphp
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Duka-App POS</title>
+    <title>Duka-App POS Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         [x-cloak] {
             display: none !important;
+        }
+
+        :root {
+            color-scheme: light;
+        }
+
+        html.dark {
+            color-scheme: dark;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .premium-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+        }
+
+        .premium-scrollbar::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .premium-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.35);
+            border-radius: 999px;
+        }
+
+        .premium-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
         }
     </style>
     <script>
@@ -17,564 +60,877 @@
             if (storedTheme === 'dark') {
                 document.documentElement.classList.add('dark');
             }
-
-            window.tailwind = window.tailwind || {};
-            window.tailwind.config = {
-                darkMode: 'class',
-                theme: {
-                    extend: {
-                        boxShadow: {
-                            panel: '0 18px 50px rgba(15, 23, 42, 0.12)',
-                        },
-                    },
-                },
-            };
         })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        console: {
+                            dark: '#0f172a',
+                            success: '#10b981',
+                        },
+                    },
+                    boxShadow: {
+                        soft: '0 1px 3px rgba(15, 23, 42, 0.08)',
+                    },
+                },
+            },
+        };
+    </script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
-<body class="h-full bg-slate-100 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100">
+<body class="h-full bg-slate-50 text-slate-900 antialiased transition-colors duration-300 dark:bg-[#020617] dark:text-slate-100">
     <div
-        x-data="posEngine()"
-        x-init="init()"
+        x-data="posConsole({
+            authenticated: @js($initialUser !== null),
+            user: @js($initialUser),
+        })"
+        x-init="boot()"
         @keydown.window="handleGlobalKeydown($event)"
-        class="h-screen w-screen overflow-hidden"
+        class="relative min-h-screen"
     >
-        <div class="grid h-full w-full grid-cols-10 gap-4 p-4 lg:gap-6 lg:p-6">
-            <section class="col-span-10 flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white shadow-panel dark:border-slate-800 dark:bg-slate-900 lg:col-span-7">
-                <header class="border-b border-slate-200 px-5 py-4 dark:border-slate-800 lg:px-6">
-                    <div class="flex flex-col gap-4 xl:flex-row xl:items-end">
-                        <div class="flex-1">
-                            <div class="mb-2 flex items-center justify-between gap-4">
-                                <div>
-                                    <h1 class="text-xl font-black tracking-tight text-slate-900 dark:text-white lg:text-2xl">Duka-App POS</h1>
-                                    <p class="text-sm text-slate-500 dark:text-slate-400">Offline-first checkout with STK Push and live till feed claiming.</p>
-                                </div>
+        <div class="pointer-events-none fixed right-4 top-4 z-50 flex w-full max-w-sm flex-col gap-3 sm:right-6 sm:top-6">
+            <template x-for="toast in toasts" :key="toast.id">
+                <div
+                    x-show="true"
+                    x-transition:enter="transform transition duration-300 ease-out"
+                    x-transition:enter-start="translate-x-6 opacity-0"
+                    x-transition:enter-end="translate-x-0 opacity-100"
+                    x-transition:leave="transform transition duration-200 ease-in"
+                    x-transition:leave-start="translate-x-0 opacity-100"
+                    x-transition:leave-end="translate-x-6 opacity-0"
+                    class="pointer-events-auto overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]"
+                >
+                    <div class="flex items-start gap-3 px-4 py-4">
+                        <div
+                            class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl"
+                            :class="toast.variant === 'success'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                                : toast.variant === 'error'
+                                    ? 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300'
+                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                        >
+                            <svg x-show="toast.variant === 'success'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m4.5 12.75 6 6 9-13.5" />
+                            </svg>
+                            <svg x-show="toast.variant === 'error'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 9v3.75m0 3.75h.007v.008H12v-.008Zm8.25-.75a8.25 8.25 0 1 1-16.5 0 8.25 8.25 0 0 1 16.5 0Z" />
+                            </svg>
+                            <svg x-show="toast.variant === 'info'" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M11.25 11.25 12 11.25v5.25m0-9h.008v.008H12V7.5ZM21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-white" x-text="toast.title"></p>
+                            <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300" x-text="toast.message"></p>
+                        </div>
+                        <button
+                            type="button"
+                            @click="dismissToast(toast.id)"
+                            class="text-slate-400 transition hover:text-slate-700 dark:hover:text-slate-100"
+                            aria-label="Dismiss notification"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 6 12 12M6 18 18 6" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </template>
+        </div>
 
-                                <button
-                                    type="button"
-                                    @click="toggleTheme()"
-                                    class="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                                    :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-                                    :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
-                                >
-                                    <svg x-show="!isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 3v2.25M12 18.75V21m9-9h-2.25M5.25 12H3m15.114 6.364-1.59-1.59M7.476 7.476l-1.59-1.59m12.228 0-1.59 1.59M7.476 16.524l-1.59 1.59M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                                    </svg>
-                                    <svg x-show="isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 12.79A9 9 0 1 1 11.21 3c0 .18-.01.36-.01.54a9 9 0 0 0 9.26 9.25c.18 0 .36 0 .54-.01Z" />
-                                    </svg>
-                                </button>
+        <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+            <header class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                <div class="flex flex-col gap-6 px-5 py-5 lg:px-6 lg:py-6">
+                    <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div class="space-y-2">
+                            <div class="inline-flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                Premium Retail Console
                             </div>
-
-                            <label for="product-search" class="mb-2 block text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                Barcode / Search
-                            </label>
-                            <div class="flex flex-col gap-3 sm:flex-row">
-                                <input
-                                    id="product-search"
-                                    x-ref="searchInput"
-                                    x-model.trim="searchTerm"
-                                    @keydown.enter.prevent="searchProduct()"
-                                    type="text"
-                                    autocomplete="off"
-                                    placeholder="Scan barcode or search by SKU / name"
-                                    class="h-16 flex-1 rounded-2xl border border-slate-300 bg-slate-50 px-5 text-lg font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-green-500 dark:focus:bg-slate-900 dark:focus:ring-green-500/10"
-                                >
-                                <button
-                                    type="button"
-                                    @click="searchProduct()"
-                                    :disabled="isSearching"
-                                    class="inline-flex h-16 items-center justify-center rounded-2xl bg-slate-900 px-8 text-base font-bold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white dark:disabled:bg-slate-600 dark:disabled:text-slate-300"
-                                >
-                                    <span x-text="isSearching ? 'Searching...' : 'Add Item'"></span>
-                                </button>
+                            <div>
+                                <h1 class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Duka-App POS</h1>
+                                <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                                    Fast checkout, margin-safe pricing, and live M-PESA capture in one operator-first console.
+                                </p>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="mt-4 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-                        <p class="text-slate-500 dark:text-slate-400">
-                            Space focuses search, F2 opens checkout, F4 prompts manager void, F10 parks cart, Esc closes modals.
-                        </p>
-                        <p class="font-semibold" :class="errorMessage ? 'text-red-600 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'" x-text="errorMessage || statusMessage"></p>
-                    </div>
-                </header>
-
-                <div class="min-h-0 flex-1 px-4 py-4 lg:px-6 lg:py-5">
-                    <div class="flex h-full min-h-0 flex-col overflow-hidden rounded-3xl border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-950/60">
-                        <div class="grid grid-cols-12 gap-3 border-b border-slate-200 px-4 py-3 text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:px-5">
-                            <div class="col-span-5">Item</div>
-                            <div class="col-span-2 text-center">Qty</div>
-                            <div class="col-span-2 text-right">Price</div>
-                            <div class="col-span-2 text-right">Total</div>
-                            <div class="col-span-1 text-right">Remove</div>
-                        </div>
-
-                        <div class="min-h-0 flex-1 overflow-y-auto">
-                            <template x-if="cart.length === 0">
-                                <div class="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-                                    <div class="rounded-full bg-slate-200 p-4 dark:bg-slate-800">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M2.25 3.75h1.386a1.5 1.5 0 0 1 1.455 1.136l.383 1.532m0 0L6.75 12.75h10.939a1.5 1.5 0 0 0 1.455-1.136l1.263-5.053H5.474Zm0 0L4.5 15.75m2.25 0A1.125 1.125 0 1 0 6.75 18a1.125 1.125 0 0 0 0-2.25Zm10.5 0A1.125 1.125 0 1 0 17.25 18a1.125 1.125 0 0 0 0-2.25Z" />
-                                        </svg>
+                        <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Cashier session</p>
+                                <div class="mt-1 flex items-center gap-3">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold text-white dark:bg-white dark:text-slate-950">
+                                        <span x-text="user ? user.name.charAt(0) : '—'"></span>
                                     </div>
                                     <div>
-                                        <p class="text-lg font-bold text-slate-900 dark:text-white">Cart is empty</p>
-                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Search a product or tap a quick-add tile to start the sale.</p>
+                                        <p class="text-sm font-semibold text-slate-900 dark:text-white" x-text="user ? user.name : 'Awaiting sign in'"></p>
+                                        <p class="text-xs uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400" x-text="user ? user.role : 'locked'"></p>
                                     </div>
                                 </div>
-                            </template>
-
-                            <template x-for="item in cart" :key="item.product_id">
-                                <div class="grid grid-cols-12 gap-3 border-b border-slate-200 px-4 py-4 text-sm dark:border-slate-800 lg:px-5">
-                                    <div class="col-span-5 flex min-w-0 flex-col justify-center">
-                                        <span class="truncate text-base font-bold text-slate-900 dark:text-white" x-text="item.name"></span>
-                                        <span class="truncate text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400" x-text="item.sku || 'Manual entry'"></span>
-                                    </div>
-
-                                    <div class="col-span-2 flex items-center justify-center gap-2">
-                                        <button
-                                            type="button"
-                                            @click="decrementQty(item.product_id)"
-                                            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                                        >
-                                            −
-                                        </button>
-                                        <span class="min-w-[3rem] text-center text-base font-bold text-slate-900 dark:text-white" x-text="formatQuantity(item.quantity)"></span>
-                                        <button
-                                            type="button"
-                                            @click="incrementQty(item.product_id)"
-                                            class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-lg font-black text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-
-                                    <div class="col-span-2 flex items-center justify-end font-semibold text-slate-700 dark:text-slate-300" x-text="formatCurrency(item.unit_price)"></div>
-                                    <div class="col-span-2 flex items-center justify-end text-base font-black text-slate-900 dark:text-white" x-text="formatCurrency(item.quantity * item.unit_price)"></div>
-                                    <div class="col-span-1 flex items-center justify-end">
-                                        <button
-                                            type="button"
-                                            @click="removeItem(item.product_id)"
-                                            class="inline-flex h-10 items-center justify-center rounded-xl bg-red-50 px-3 text-xs font-black uppercase tracking-wide text-red-600 transition hover:bg-red-100 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/20"
-                                        >
-                                            Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-
-                <footer class="border-t border-slate-200 bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 lg:px-6 lg:py-5">
-                    <div class="grid gap-5 xl:grid-cols-[1fr_22rem]">
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60">
-                                <span class="text-base font-semibold text-slate-500 dark:text-slate-400">Subtotal</span>
-                                <span class="text-xl font-bold text-slate-900 dark:text-white" x-text="formatCurrency(subtotal)"></span>
                             </div>
-                            <div class="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-950/60">
-                                <span class="text-base font-semibold text-slate-500 dark:text-slate-400">Tax</span>
-                                <span class="text-xl font-bold text-slate-900 dark:text-white" x-text="formatCurrency(tax)"></span>
-                            </div>
-                            <div class="flex items-center justify-between rounded-3xl bg-slate-950 px-5 py-5 text-white dark:bg-slate-100 dark:text-slate-950">
-                                <span class="text-lg font-black uppercase tracking-[0.18em]">Grand Total</span>
-                                <span class="text-4xl font-black tracking-tight lg:text-5xl" x-text="formatCurrency(grandTotal)"></span>
-                            </div>
-                        </div>
 
-                        <div class="grid gap-3">
                             <button
                                 type="button"
-                                @click="openCheckoutModal()"
-                                :disabled="cart.length === 0 || isBusy"
-                                class="inline-flex h-24 items-center justify-center rounded-3xl bg-green-600 px-6 text-3xl font-black uppercase tracking-wide text-white shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300 dark:disabled:bg-green-900/40"
+                                @click="toggleTheme()"
+                                class="inline-flex h-14 items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-700 dark:hover:bg-slate-800"
+                                :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
                             >
-                                Pay (F2)
-                            </button>
-                            <button
-                                type="button"
-                                @click="promptVoidCart()"
-                                :disabled="cart.length === 0 || isBusy"
-                                class="inline-flex h-16 items-center justify-center rounded-2xl bg-red-600 px-6 text-lg font-black uppercase tracking-wide text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-red-300 dark:disabled:bg-red-900/40"
-                            >
-                                Void (F4)
-                            </button>
-                            <button
-                                type="button"
-                                @click="parkCart()"
-                                :disabled="cart.length === 0 || isBusy"
-                                class="inline-flex h-16 items-center justify-center rounded-2xl bg-yellow-500 px-6 text-lg font-black uppercase tracking-wide text-slate-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:bg-yellow-200"
-                            >
-                                Park (F10)
+                                <svg x-show="!isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 3v1.5m0 15V21m9-9h-1.5m-15 0H3m15.364 6.364-1.06-1.06M6.697 6.697 5.636 5.636m12.728 0-1.06 1.06M6.697 17.303l-1.06 1.06M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                                </svg>
+                                <svg x-show="isDark" x-cloak xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 12.79A9 9 0 1 1 11.21 3c-.11.57-.17 1.15-.17 1.75a9 9 0 0 0 9.21 9.04c.58 0 1.16-.06 1.75-.17Z" />
+                                </svg>
+                                <span x-text="isDark ? 'Light mode' : 'Dark mode'"></span>
                             </button>
                         </div>
                     </div>
-                </footer>
-            </section>
 
-            <aside class="col-span-10 flex min-h-0 flex-col rounded-3xl border border-slate-200 bg-white shadow-panel dark:border-slate-800 dark:bg-slate-900 lg:col-span-3">
-                <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-                    <h2 class="text-lg font-black uppercase tracking-[0.18em] text-slate-900 dark:text-white">Quick Add</h2>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Common items for rapid basket building.</p>
-                </div>
-
-                <div class="min-h-0 flex-1">
-                    <div class="grid h-full min-h-0 grid-rows-2">
-                        <div class="min-h-0 border-b border-slate-200 p-4 dark:border-slate-800">
-                            <div class="grid h-full min-h-0 grid-cols-2 gap-3 overflow-y-auto">
-                                <template x-for="item in quickAddItems" :key="item">
+                    <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+                        <div class="space-y-4">
+                            <div class="relative">
+                                <label for="product-search" class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">
+                                    Product discovery
+                                </label>
+                                <div class="flex flex-col gap-3 sm:flex-row">
+                                    <div class="relative flex-1">
+                                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 dark:text-slate-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m21 21-4.35-4.35m1.6-5.4a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z" />
+                                            </svg>
+                                        </span>
+                                        <input
+                                            id="product-search"
+                                            x-ref="searchInput"
+                                            x-model.trim="searchTerm"
+                                            @keydown.enter.prevent="searchProducts()"
+                                            type="text"
+                                            autocomplete="off"
+                                            placeholder="Scan barcode or type Mac, AirPods, Coffee..."
+                                            class="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-base font-medium text-slate-950 outline-none shadow-sm transition placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-emerald-400 dark:focus:bg-[#0b1220] dark:focus:ring-emerald-500/10"
+                                        >
+                                    </div>
                                     <button
                                         type="button"
-                                        @click="quickAdd(item)"
-                                        class="flex min-h-28 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-center text-base font-black text-slate-800 transition hover:border-green-400 hover:bg-green-50 hover:text-green-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-green-500 dark:hover:bg-green-500/10 dark:hover:text-green-300"
-                                        x-text="item"
+                                        @click="searchProducts()"
+                                        :disabled="isSearching"
+                                        class="inline-flex h-14 items-center justify-center rounded-2xl bg-emerald-500 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300 dark:disabled:bg-emerald-800/50"
+                                    >
+                                        <span x-text="isSearching ? 'Searching…' : 'Search inventory'"></span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="term in quickSearchTerms" :key="term">
+                                    <button
+                                        type="button"
+                                        @click="searchProducts(term)"
+                                        class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
+                                        x-text="term"
                                     ></button>
                                 </template>
+                                <button
+                                    x-show="hasParkedCart"
+                                    x-cloak
+                                    type="button"
+                                    @click="restoreParkedCart()"
+                                    class="inline-flex items-center rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300 dark:hover:bg-amber-500/15"
+                                >
+                                    Restore parked cart
+                                </button>
                             </div>
                         </div>
 
-                        <div class="min-h-0 p-4">
-                            <div class="mb-3 flex items-center justify-between gap-3">
+                        <div class="grid gap-3 sm:grid-cols-3 xl:w-[28rem]">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Status</p>
+                                <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white" x-text="statusMessage"></p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Items</p>
+                                <p class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white" x-text="totalItems"></p>
+                            </div>
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Hotkeys</p>
+                                <p class="mt-2 text-sm font-medium text-slate-900 dark:text-white">F2 Pay · F4 Void · F10 Park</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="grid flex-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_24rem]">
+                <div class="grid min-h-0 gap-6">
+                    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                        <div class="flex flex-col gap-4 px-5 py-5 lg:px-6">
+                            <div class="flex items-center justify-between gap-4">
                                 <div>
-                                    <h3 class="text-lg font-black uppercase tracking-[0.18em] text-slate-900 dark:text-white">Live Till Feed</h3>
-                                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pending C2B payments from the last 24 hours.</p>
+                                    <h2 class="text-lg font-semibold text-slate-950 dark:text-white">Search results</h2>
+                                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                        Scan once, review visually, then add exactly what the customer wants.
+                                    </p>
                                 </div>
-                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300" x-text="`${livePayments.length} pending`"></span>
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500" x-text="hasSearched ? `${searchResults.length} match${searchResults.length === 1 ? '' : 'es'}` : 'Awaiting search'"></p>
                             </div>
 
-                            <div class="h-full min-h-0 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-950/60">
-                                <template x-if="livePayments.length === 0">
-                                    <div class="flex h-full min-h-[12rem] items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400">
-                                        Waiting for incoming M-PESA payments...
+                            <div class="premium-scrollbar min-h-[18rem]">
+                                <template x-if="isSearching">
+                                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        <template x-for="index in 6" :key="index">
+                                            <div class="animate-pulse rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-900/60">
+                                                <div class="h-3 w-20 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+                                                <div class="mt-4 h-5 w-3/4 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+                                                <div class="mt-3 h-4 w-1/2 rounded-full bg-slate-200 dark:bg-slate-800"></div>
+                                                <div class="mt-6 h-10 rounded-2xl bg-slate-200 dark:bg-slate-800"></div>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
 
+                                <template x-if="!isSearching && searchResults.length > 0">
+                                    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        <template x-for="product in searchResults" :key="product.id">
+                                            <article class="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm transition hover:border-slate-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/70 dark:hover:border-slate-700 dark:hover:bg-slate-900">
+                                                <div class="flex items-start justify-between gap-4">
+                                                    <div class="min-w-0">
+                                                        <p class="truncate text-lg font-semibold text-slate-950 dark:text-white" x-text="product.name"></p>
+                                                        <p class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500" x-text="product.sku"></p>
+                                                    </div>
+                                                    <span class="rounded-2xl bg-slate-900 px-3 py-1 text-xs font-semibold text-white dark:bg-white dark:text-slate-950" x-text="formatCurrency(product.base_price)"></span>
+                                                </div>
+
+                                                <div class="mt-6 grid grid-cols-2 gap-3 text-sm">
+                                                    <div class="rounded-2xl bg-white px-3 py-3 dark:bg-[#0b1220]">
+                                                        <p class="text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Stock</p>
+                                                        <p class="mt-1 font-semibold text-slate-900 dark:text-white" x-text="formatQuantity(product.stock_quantity)"></p>
+                                                    </div>
+                                                    <div class="rounded-2xl bg-white px-3 py-3 dark:bg-[#0b1220]">
+                                                        <p class="text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Tax</p>
+                                                        <p class="mt-1 font-semibold text-slate-900 dark:text-white" x-text="`${Number(product.tax_category?.rate ?? 0)}%`"></p>
+                                                    </div>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    @click="addProductToCart(product)"
+                                                    class="mt-6 inline-flex h-12 w-full items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600"
+                                                >
+                                                    Add to cart
+                                                </button>
+                                            </article>
+                                        </template>
+                                    </div>
+                                </template>
+
+                                <template x-if="!isSearching && searchResults.length === 0">
+                                    <div class="flex min-h-[18rem] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center dark:border-slate-800 dark:bg-slate-900/40">
+                                        <div class="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-[#0f172a]">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7.5h18M6.75 4.5h10.5A2.25 2.25 0 0 1 19.5 6.75v10.5A2.25 2.25 0 0 1 17.25 19.5H6.75A2.25 2.25 0 0 1 4.5 17.25V6.75A2.25 2.25 0 0 1 6.75 4.5Z" />
+                                            </svg>
+                                        </div>
+                                        <p class="mt-6 text-lg font-semibold text-slate-950 dark:text-white">Ready to scan…</p>
+                                        <p class="mt-2 max-w-md text-sm leading-6 text-slate-500 dark:text-slate-400">
+                                            Start with a barcode, SKU, or product name. Try <span class="font-semibold text-slate-700 dark:text-slate-300">Mac</span>, <span class="font-semibold text-slate-700 dark:text-slate-300">AirPods</span>, or <span class="font-semibold text-slate-700 dark:text-slate-300">Coffee</span>.
+                                        </p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                            <div class="flex h-full min-h-[24rem] flex-col">
+                                <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800 lg:px-6">
+                                    <div>
+                                        <h2 class="text-lg font-semibold text-slate-950 dark:text-white">Current cart</h2>
+                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Every change is reflected in the payment pane instantly.</p>
+                                    </div>
+                                    <span class="rounded-2xl bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600 dark:bg-slate-900 dark:text-slate-300" x-text="`${cart.length} line${cart.length === 1 ? '' : 's'}`"></span>
+                                </div>
+
+                                <div class="premium-scrollbar min-h-0 flex-1 overflow-y-auto px-5 py-4 lg:px-6">
+                                    <template x-if="cart.length === 0">
+                                        <div class="flex h-full min-h-[16rem] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center dark:border-slate-800 dark:bg-slate-900/40">
+                                            <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-[#0b1220]">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M2.25 3.75h1.386a1.5 1.5 0 0 1 1.455 1.136l.383 1.532m0 0L6.75 12.75h10.939a1.5 1.5 0 0 0 1.455-1.136l1.263-5.053H5.474Zm0 0L4.5 15.75m2.25 0A1.125 1.125 0 1 0 6.75 18a1.125 1.125 0 0 0 0-2.25Zm10.5 0A1.125 1.125 0 1 0 17.25 18a1.125 1.125 0 0 0 0-2.25Z" />
+                                                </svg>
+                                            </div>
+                                            <p class="mt-5 text-base font-semibold text-slate-950 dark:text-white">No items in the cart yet</p>
+                                            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Search inventory above and add products one click at a time.</p>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="cart.length > 0">
+                                        <div class="space-y-3">
+                                            <template x-for="item in cart" :key="item.product_id">
+                                                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                                                    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                                        <div class="min-w-0">
+                                                            <p class="truncate text-base font-semibold text-slate-950 dark:text-white" x-text="item.name"></p>
+                                                            <p class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500" x-text="item.sku || 'Manual item'"></p>
+                                                        </div>
+                                                        <div class="text-left sm:text-right">
+                                                            <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Line total</p>
+                                                            <p class="text-lg font-semibold text-slate-950 dark:text-white" x-text="formatCurrency(item.quantity * item.unit_price)"></p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                                                        <div class="inline-flex items-center gap-2 rounded-2xl bg-white p-1 shadow-sm dark:bg-[#0b1220]">
+                                                            <button
+                                                                type="button"
+                                                                @click="decrementQty(item.product_id)"
+                                                                class="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-lg font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                                                            >
+                                                                −
+                                                            </button>
+                                                            <span class="min-w-[3rem] text-center text-sm font-semibold text-slate-950 dark:text-white" x-text="formatQuantity(item.quantity)"></span>
+                                                            <button
+                                                                type="button"
+                                                                @click="incrementQty(item.product_id)"
+                                                                class="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-lg font-semibold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                                                            >
+                                                                +
+                                                            </button>
+                                                        </div>
+
+                                                        <div class="rounded-2xl bg-white px-4 py-2 shadow-sm dark:bg-[#0b1220]">
+                                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Unit price</p>
+                                                            <p class="mt-1 text-sm font-semibold text-slate-950 dark:text-white" x-text="formatCurrency(item.unit_price)"></p>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            @click="removeItem(item.product_id)"
+                                                            class="inline-flex h-10 items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-600 shadow-sm transition hover:bg-red-100 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+
+                        <aside class="rounded-2xl bg-slate-950 p-5 text-white shadow-sm dark:bg-white dark:text-slate-950 lg:p-6">
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-white/60 dark:text-slate-500">Grand total</p>
+                            <div class="mt-6">
+                                <p class="text-5xl font-semibold tracking-tight" x-text="formatCurrency(grandTotal)"></p>
+                                <p class="mt-2 text-sm text-white/70 dark:text-slate-500">Server-side pricing rules still apply on checkout, including expiry markdowns and margin protection.</p>
+                            </div>
+
+                            <div class="mt-8 space-y-4">
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-white/60 dark:text-slate-500">Subtotal</span>
+                                    <span class="font-semibold" x-text="formatCurrency(subtotal)"></span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-white/60 dark:text-slate-500">Tax</span>
+                                    <span class="font-semibold" x-text="formatCurrency(tax)"></span>
+                                </div>
+                                <div class="flex items-center justify-between text-sm">
+                                    <span class="text-white/60 dark:text-slate-500">Units</span>
+                                    <span class="font-semibold" x-text="formatQuantity(totalItems)"></span>
+                                </div>
+                            </div>
+
+                            <div class="mt-8 space-y-3">
+                                <button
+                                    type="button"
+                                    @click="openCheckoutModal()"
+                                    :disabled="cart.length === 0 || isBusy"
+                                    class="inline-flex h-14 w-full items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                                >
+                                    Proceed to payment
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="openManagerApproval()"
+                                    :disabled="cart.length === 0 || isBusy"
+                                    class="inline-flex h-12 w-full items-center justify-center rounded-2xl bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:bg-white/5 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800"
+                                >
+                                    Void with manager approval
+                                </button>
+                                <button
+                                    type="button"
+                                    @click="parkCart()"
+                                    :disabled="cart.length === 0 || isBusy"
+                                    class="inline-flex h-12 w-full items-center justify-center rounded-2xl border border-white/15 bg-transparent text-sm font-semibold text-white transition hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-300 dark:text-slate-900 dark:hover:bg-slate-100"
+                                >
+                                    Park cart on this device
+                                </button>
+                            </div>
+                        </aside>
+                    </section>
+                </div>
+
+                <aside class="grid min-h-0 gap-6">
+                    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                        <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                            <h2 class="text-lg font-semibold text-slate-950 dark:text-white">Live till feed</h2>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pending M-PESA deposits from the last 24 hours.</p>
+                        </div>
+
+                        <div class="premium-scrollbar max-h-[30rem] overflow-y-auto px-5 py-4">
+                            <template x-if="livePayments.length === 0">
+                                <div class="flex min-h-[14rem] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 text-center dark:border-slate-800 dark:bg-slate-900/40">
+                                    <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-[#0b1220]">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M12 6v6l4 2.25M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                        </svg>
+                                    </div>
+                                    <p class="mt-5 text-base font-semibold text-slate-950 dark:text-white">No incoming payments yet</p>
+                                    <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Webhook-captured M-PESA transactions will surface here automatically.</p>
+                                </div>
+                            </template>
+
+                            <template x-if="livePayments.length > 0">
                                 <div class="space-y-3">
                                     <template x-for="payment in livePayments" :key="payment.id">
                                         <button
                                             type="button"
                                             @click="selectLivePayment(payment)"
-                                            class="w-full rounded-2xl border px-4 py-3 text-left transition"
-                                            :class="selectedTransactionCode === payment.transaction_code
-                                                ? 'border-green-500 bg-green-50 text-green-900 dark:bg-green-500/10 dark:text-green-100'
-                                                : 'border-slate-200 bg-white text-slate-900 hover:border-green-400 hover:bg-green-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-green-500 dark:hover:bg-green-500/10'"
+                                            class="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left shadow-sm transition hover:border-emerald-300 hover:bg-white dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-emerald-500/40 dark:hover:bg-slate-900"
                                         >
-                                            <div class="flex items-start justify-between gap-3">
+                                            <div class="flex items-start justify-between gap-4">
                                                 <div class="min-w-0">
-                                                    <p class="truncate text-base font-black" x-text="payment.customer_name"></p>
-                                                    <p class="mt-1 truncate text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400" x-text="payment.transaction_code"></p>
-                                                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="payment.phone_number || 'Phone unavailable'"></p>
+                                                    <p class="truncate text-sm font-semibold text-slate-950 dark:text-white" x-text="payment.customer_name"></p>
+                                                    <p class="mt-1 truncate text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500" x-text="payment.transaction_code"></p>
                                                 </div>
-                                                <span class="text-base font-black" x-text="formatCurrency(payment.amount)"></span>
+                                                <span class="rounded-2xl bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" x-text="formatCurrency(payment.amount)"></span>
                                             </div>
-                                            <div class="mt-2 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                            <div class="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                                <span x-text="payment.phone_number || 'Phone hidden'"></span>
                                                 <span x-text="formatTimestamp(payment.created_at)"></span>
-                                                <span class="font-black uppercase tracking-wide">Use Payment</span>
                                             </div>
                                         </button>
                                     </template>
                                 </div>
+                            </template>
+                        </div>
+                    </section>
+
+                    <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                        <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+                            <h2 class="text-lg font-semibold text-slate-950 dark:text-white">Operator guidance</h2>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Minimal friction for the cashier, tight controls for the business.</p>
+                        </div>
+                        <div class="space-y-3 px-5 py-4 text-sm">
+                            <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/60">
+                                <p class="font-semibold text-slate-950 dark:text-white">1. Sign in with staff PIN</p>
+                                <p class="mt-1 leading-6 text-slate-500 dark:text-slate-400">The overlay blocks checkout until a cashier session is established.</p>
+                            </div>
+                            <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/60">
+                                <p class="font-semibold text-slate-950 dark:text-white">2. Search or scan</p>
+                                <p class="mt-1 leading-6 text-slate-500 dark:text-slate-400">Search results stay visible, so the operator can confirm the right item before adding it.</p>
+                            </div>
+                            <div class="rounded-2xl bg-slate-50 p-4 dark:bg-slate-900/60">
+                                <p class="font-semibold text-slate-950 dark:text-white">3. Complete payment</p>
+                                <p class="mt-1 leading-6 text-slate-500 dark:text-slate-400">Cash, STK push, and claimed live-feed payments all flow through the same premium checkout modal.</p>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </aside>
+                    </section>
+                </aside>
+            </main>
         </div>
 
         <div
             x-cloak
             x-show="showCheckoutModal"
             x-transition.opacity
-            class="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm"
-            @click="closeCheckoutModal()"
-        ></div>
-
-        <div
-            x-cloak
-            x-show="showCheckoutModal"
-            x-transition
-            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 px-4 py-4 backdrop-blur-sm"
         >
-            <div
-                class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-900"
-                @click.stop
-            >
-                <div class="border-b border-slate-200 px-5 py-4 dark:border-slate-800 lg:px-6">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <h2 class="text-2xl font-black tracking-tight text-slate-900 dark:text-white">Checkout</h2>
-                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose a payment path and submit the sale to the backend.</p>
+            <div class="grid max-h-[92vh] w-full max-w-6xl gap-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a] lg:grid-cols-[minmax(0,1.1fr)_24rem]">
+                <div class="premium-scrollbar min-h-0 overflow-y-auto">
+                    <div class="border-b border-slate-200 px-5 py-5 dark:border-slate-800 lg:px-6">
+                        <div class="flex items-start justify-between gap-4">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Checkout</p>
+                                <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Choose payment method</h2>
+                                <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">The server recalculates pricing and validates payment totals before completing the sale.</p>
+                            </div>
+                            <button
+                                type="button"
+                                @click="closeCheckoutModal()"
+                                class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
+                                aria-label="Close checkout modal"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 6 12 12M6 18 18 6" />
+                                </svg>
+                            </button>
                         </div>
-                        <button
-                            type="button"
-                            @click="closeCheckoutModal()"
-                            class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-                            aria-label="Close checkout modal"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
 
-                <div class="grid min-h-0 flex-1 gap-0 lg:grid-cols-[1.1fr_0.9fr]">
-                    <div class="border-b border-slate-200 p-5 dark:border-slate-800 lg:border-b-0 lg:border-r lg:p-6">
-                        <div class="flex flex-wrap gap-2">
+                        <div class="mt-6 flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 @click="activePaymentTab = 'cash'"
-                                class="rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-wide transition"
+                                class="inline-flex h-11 items-center rounded-2xl px-4 text-sm font-semibold transition"
                                 :class="activePaymentTab === 'cash'
-                                    ? 'bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-950'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : 'border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white'"
                             >
                                 Cash
                             </button>
                             <button
                                 type="button"
                                 @click="activePaymentTab = 'stk'"
-                                class="rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-wide transition"
+                                class="inline-flex h-11 items-center rounded-2xl px-4 text-sm font-semibold transition"
                                 :class="activePaymentTab === 'stk'
-                                    ? 'bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-950'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : 'border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white'"
                             >
-                                STK Push
+                                M-PESA STK
                             </button>
                             <button
                                 type="button"
                                 @click="activePaymentTab = 'live-feed'"
-                                class="rounded-2xl px-4 py-3 text-sm font-black uppercase tracking-wide transition"
+                                class="inline-flex h-11 items-center rounded-2xl px-4 text-sm font-semibold transition"
                                 :class="activePaymentTab === 'live-feed'
-                                    ? 'bg-slate-950 text-white dark:bg-slate-100 dark:text-slate-950'
-                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'"
+                                    ? 'bg-emerald-500 text-white shadow-sm'
+                                    : 'border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white'"
                             >
-                                Live Feed Link
+                                Live till feed
                             </button>
                         </div>
+                    </div>
 
-                        <div class="mt-6 min-h-[20rem]">
-                            <div x-show="activePaymentTab === 'cash'" x-cloak class="space-y-5">
-                                <div>
-                                    <label for="cash-tendered" class="mb-2 block text-sm font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                        Cash Received
-                                    </label>
+                    <div class="px-5 py-5 lg:px-6">
+                        <div x-show="activePaymentTab === 'cash'" class="space-y-5">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                                <div class="flex items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-950 dark:text-white">Cash tendered</p>
+                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Use presets for fast retail cash handling.</p>
+                                    </div>
+                                    <p class="text-2xl font-semibold text-slate-950 dark:text-white" x-text="formatCurrency(Number(cashTendered || 0))"></p>
+                                </div>
+
+                                <div class="mt-5 grid gap-3 sm:grid-cols-2">
                                     <input
-                                        id="cash-tendered"
                                         x-model.number="cashTendered"
                                         type="number"
                                         min="0"
                                         step="0.01"
-                                        class="h-16 w-full rounded-2xl border border-slate-300 bg-slate-50 px-5 text-2xl font-black text-slate-900 outline-none transition focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-green-500 dark:focus:bg-slate-900 dark:focus:ring-green-500/10"
+                                        class="h-14 rounded-2xl border border-slate-200 bg-white px-4 text-base font-medium text-slate-950 outline-none shadow-sm transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-800 dark:bg-[#0b1220] dark:text-white dark:focus:ring-emerald-500/10"
+                                        placeholder="Enter cash received"
                                     >
+                                    <div class="flex items-center justify-between rounded-2xl bg-white px-4 py-3 shadow-sm dark:bg-[#0b1220]">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Change</p>
+                                            <p class="mt-1 text-lg font-semibold" :class="cashChange >= 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-red-600 dark:text-red-300'" x-text="formatCurrency(cashChange)"></p>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div class="mt-5 flex flex-wrap gap-2">
                                     <template x-for="preset in cashPresets" :key="preset">
                                         <button
                                             type="button"
                                             @click="setCashTendered(preset)"
-                                            class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm font-black uppercase tracking-wide text-slate-700 transition hover:border-green-400 hover:bg-green-50 hover:text-green-700 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:hover:border-green-500 dark:hover:bg-green-500/10 dark:hover:text-green-300"
+                                            class="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-[#0b1220] dark:text-slate-200 dark:hover:border-slate-700 dark:hover:text-white"
                                             x-text="formatCurrency(preset)"
                                         ></button>
                                     </template>
                                 </div>
-
-                                <div class="grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
-                                    <div class="flex items-center justify-between">
-                                        <span class="font-semibold text-slate-500 dark:text-slate-400">Amount Due</span>
-                                        <span class="text-2xl font-black text-slate-900 dark:text-white" x-text="formatCurrency(grandTotal)"></span>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <span class="font-semibold text-slate-500 dark:text-slate-400">Change</span>
-                                        <span class="text-2xl font-black" :class="cashChange >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'" x-text="formatCurrency(cashChange)"></span>
-                                    </div>
-                                </div>
                             </div>
+                        </div>
 
-                            <div x-show="activePaymentTab === 'stk'" x-cloak class="space-y-5">
-                                <div>
-                                    <label for="stk-phone" class="mb-2 block text-sm font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                        M-PESA Phone Number
-                                    </label>
-                                    <input
-                                        id="stk-phone"
-                                        x-model.trim="stk.phone"
-                                        type="text"
-                                        placeholder="2547XXXXXXXX"
-                                        class="h-16 w-full rounded-2xl border border-slate-300 bg-slate-50 px-5 text-xl font-semibold text-slate-900 outline-none transition focus:border-green-500 focus:bg-white focus:ring-4 focus:ring-green-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:focus:border-green-500 dark:focus:bg-slate-900 dark:focus:ring-green-500/10"
+                        <div x-show="activePaymentTab === 'stk'" x-cloak class="space-y-5">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                                <div class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                    <div>
+                                        <label class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Customer phone</label>
+                                        <input
+                                            x-model.trim="stk.phone"
+                                            type="text"
+                                            inputmode="tel"
+                                            placeholder="2547XXXXXXXX"
+                                            class="h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-base font-medium text-slate-950 outline-none shadow-sm transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 dark:border-slate-800 dark:bg-[#0b1220] dark:text-white dark:focus:ring-emerald-500/10"
+                                        >
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="startStkPush()"
+                                        :disabled="stk.isSubmitting || stk.isPolling"
+                                        class="inline-flex h-14 items-center justify-center rounded-2xl bg-emerald-500 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
                                     >
+                                        <span x-text="stk.isSubmitting ? 'Sending…' : 'Send STK push'"></span>
+                                    </button>
                                 </div>
 
-                                <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
-                                    <div class="flex items-center justify-between">
-                                        <span class="font-semibold text-slate-500 dark:text-slate-400">Amount</span>
-                                        <span class="text-3xl font-black text-slate-900 dark:text-white" x-text="formatCurrency(grandTotal)"></span>
-                                    </div>
-                                    <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">The STK request will use the current cart total and a generated POS reference.</p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    @click="startStkPush()"
-                                    :disabled="stk.isSubmitting || stk.isPolling || grandTotal <= 0"
-                                    class="inline-flex h-16 w-full items-center justify-center rounded-2xl bg-green-600 px-6 text-lg font-black uppercase tracking-wide text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300 dark:disabled:bg-green-900/40"
-                                >
-                                    <span x-text="stk.isSubmitting ? 'Sending STK...' : (stk.isPolling ? 'Polling Status...' : 'Send STK Push')"></span>
-                                </button>
-
-                                <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex items-center justify-between gap-4">
-                                            <span class="font-semibold text-slate-500 dark:text-slate-400">Checkout Request ID</span>
-                                            <span class="max-w-[18rem] truncate font-mono text-slate-900 dark:text-white" x-text="stk.checkoutRequestId || 'Pending initiation'"></span>
+                                <div class="mt-5 rounded-2xl bg-white p-4 shadow-sm dark:bg-[#0b1220]">
+                                    <div class="flex items-center justify-between gap-4">
+                                        <div>
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">STK status</p>
+                                            <p class="mt-2 text-lg font-semibold" :class="stkStatusClass()" x-text="stk.statusLabel"></p>
                                         </div>
-                                        <div class="flex items-center justify-between gap-4">
-                                            <span class="font-semibold text-slate-500 dark:text-slate-400">Status</span>
-                                            <span class="font-black uppercase tracking-wide" :class="stkStatusClass()" x-text="stk.statusLabel"></span>
+                                        <div class="text-right">
+                                            <p class="text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Reference</p>
+                                            <p class="mt-2 text-sm font-semibold text-slate-900 dark:text-white" x-text="stk.checkoutRequestId || 'Pending request'"></p>
                                         </div>
-                                        <p class="pt-2 text-slate-500 dark:text-slate-400" x-text="stk.statusMessage || 'No STK request has been sent yet.'"></p>
                                     </div>
+                                    <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400" x-text="stk.statusMessage || 'Ready to initiate STK payment.'"></p>
                                 </div>
                             </div>
+                        </div>
 
-                            <div x-show="activePaymentTab === 'live-feed'" x-cloak class="space-y-5">
-                                <template x-if="selectedLivePayment">
-                                    <div class="rounded-3xl border border-green-500 bg-green-50 p-5 dark:bg-green-500/10">
-                                        <div class="flex items-start justify-between gap-4">
-                                            <div>
-                                                <h3 class="text-lg font-black text-green-900 dark:text-green-100" x-text="selectedLivePayment.customer_name"></h3>
-                                                <p class="mt-1 text-sm font-semibold uppercase tracking-wide text-green-800 dark:text-green-200" x-text="selectedLivePayment.transaction_code"></p>
-                                                <p class="mt-3 text-sm text-green-800 dark:text-green-200">
-                                                    Incoming amount:
-                                                    <span class="font-black" x-text="formatCurrency(selectedLivePayment.amount)"></span>
-                                                </p>
-                                                <p class="mt-1 text-sm text-green-800 dark:text-green-200" x-text="selectedLivePayment.phone_number || 'Phone unavailable'"></p>
+                        <div x-show="activePaymentTab === 'live-feed'" x-cloak class="space-y-5">
+                            <div class="rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                                <div class="flex items-center justify-between gap-4">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-950 dark:text-white">Claim a live payment</p>
+                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Choose one of the pending till payments from the right-hand feed.</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        @click="fetchLivePayments()"
+                                        class="inline-flex h-11 items-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-[#0b1220] dark:text-slate-200 dark:hover:border-slate-700 dark:hover:text-white"
+                                    >
+                                        Refresh
+                                    </button>
+                                </div>
+
+                                <div class="mt-5 rounded-2xl bg-white p-4 shadow-sm dark:bg-[#0b1220]">
+                                    <template x-if="selectedLivePayment">
+                                        <div>
+                                            <div class="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <p class="text-lg font-semibold text-slate-950 dark:text-white" x-text="selectedLivePayment.customer_name"></p>
+                                                    <p class="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500" x-text="selectedLivePayment.transaction_code"></p>
+                                                </div>
+                                                <span class="rounded-2xl bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" x-text="formatCurrency(selectedLivePayment.amount)"></span>
                                             </div>
-                                            <button
-                                                type="button"
-                                                @click="clearSelectedLivePayment()"
-                                                class="rounded-2xl border border-green-600 px-3 py-2 text-xs font-black uppercase tracking-wide text-green-800 transition hover:bg-green-100 dark:border-green-400 dark:text-green-200 dark:hover:bg-green-500/10"
-                                            >
-                                                Clear
-                                            </button>
+                                            <div class="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+                                                <span x-text="selectedLivePayment.phone_number || 'Phone hidden'"></span>
+                                                <span x-text="formatTimestamp(selectedLivePayment.created_at)"></span>
+                                            </div>
                                         </div>
-                                    </div>
-                                </template>
-
-                                <template x-if="!selectedLivePayment">
-                                    <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-400">
-                                        Click a payer from the Live Till Feed on the right to link that incoming M-PESA payment to this sale.
-                                    </div>
-                                </template>
-
-                                <div class="rounded-3xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/60">
-                                    <div class="flex items-center justify-between">
-                                        <span class="font-semibold text-slate-500 dark:text-slate-400">Sale Total</span>
-                                        <span class="text-3xl font-black text-slate-900 dark:text-white" x-text="formatCurrency(grandTotal)"></span>
-                                    </div>
-                                    <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                                        On submission, the selected transaction code will be sent as
-                                        <code class="rounded bg-slate-200 px-1 py-0.5 text-xs dark:bg-slate-800">claim_transaction_code</code>
-                                        and attached to the M-PESA payment line.
-                                    </p>
+                                    </template>
+                                    <template x-if="!selectedLivePayment">
+                                        <div class="text-sm text-slate-500 dark:text-slate-400">
+                                            Select a payment from the live till feed to bind it to this sale.
+                                        </div>
+                                    </template>
                                 </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="min-h-0 bg-slate-50 p-5 dark:bg-slate-950/60 lg:p-6">
-                        <div class="rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
-                            <h3 class="text-lg font-black uppercase tracking-[0.18em] text-slate-900 dark:text-white">Order Summary</h3>
-                            <div class="mt-4 max-h-64 space-y-3 overflow-y-auto">
-                                <template x-for="item in cart" :key="`summary-${item.product_id}`">
-                                    <div class="flex items-start justify-between gap-4 border-b border-slate-100 pb-3 dark:border-slate-800">
+                <aside class="border-t border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/60 lg:border-l lg:border-t-0">
+                    <div class="premium-scrollbar max-h-[92vh] overflow-y-auto px-5 py-5 lg:px-6">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Order summary</p>
+                        <p class="mt-3 text-4xl font-semibold tracking-tight text-slate-950 dark:text-white" x-text="formatCurrency(grandTotal)"></p>
+
+                        <div class="mt-6 space-y-3">
+                            <template x-for="item in cart" :key="`summary-${item.product_id}`">
+                                <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#0b1220]">
+                                    <div class="flex items-start justify-between gap-4">
                                         <div class="min-w-0">
-                                            <p class="truncate font-bold text-slate-900 dark:text-white" x-text="item.name"></p>
-                                            <p class="text-sm text-slate-500 dark:text-slate-400">
+                                            <p class="truncate text-sm font-semibold text-slate-950 dark:text-white" x-text="item.name"></p>
+                                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                                                 <span x-text="formatQuantity(item.quantity)"></span>
                                                 ×
                                                 <span x-text="formatCurrency(item.unit_price)"></span>
                                             </p>
                                         </div>
-                                        <span class="font-black text-slate-900 dark:text-white" x-text="formatCurrency(item.quantity * item.unit_price)"></span>
+                                        <span class="text-sm font-semibold text-slate-950 dark:text-white" x-text="formatCurrency(item.quantity * item.unit_price)"></span>
                                     </div>
-                                </template>
-                            </div>
+                                </div>
+                            </template>
+                        </div>
 
-                            <div class="mt-5 space-y-3">
-                                <div class="flex items-center justify-between text-sm font-semibold text-slate-500 dark:text-slate-400">
-                                    <span>Subtotal</span>
-                                    <span x-text="formatCurrency(subtotal)"></span>
-                                </div>
-                                <div class="flex items-center justify-between text-sm font-semibold text-slate-500 dark:text-slate-400">
-                                    <span>Tax</span>
-                                    <span x-text="formatCurrency(tax)"></span>
-                                </div>
-                                <div class="flex items-center justify-between rounded-2xl bg-slate-950 px-4 py-4 text-white dark:bg-slate-100 dark:text-slate-950">
-                                    <span class="text-sm font-black uppercase tracking-[0.18em]">Grand Total</span>
-                                    <span class="text-3xl font-black" x-text="formatCurrency(grandTotal)"></span>
-                                </div>
+                        <div class="mt-6 space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-[#0b1220]">
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-slate-500 dark:text-slate-400">Subtotal</span>
+                                <span class="font-semibold text-slate-950 dark:text-white" x-text="formatCurrency(subtotal)"></span>
                             </div>
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-slate-500 dark:text-slate-400">Tax</span>
+                                <span class="font-semibold text-slate-950 dark:text-white" x-text="formatCurrency(tax)"></span>
+                            </div>
+                        </div>
 
-                            <div class="mt-5 grid gap-3">
-                                <button
-                                    type="button"
-                                    @click="submitCheckout()"
-                                    :disabled="!canSubmitCheckout() || isSubmittingCheckout"
-                                    class="inline-flex h-16 items-center justify-center rounded-2xl bg-green-600 px-6 text-lg font-black uppercase tracking-wide text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-green-300 dark:disabled:bg-green-900/40"
-                                >
-                                    <span x-text="isSubmittingCheckout ? 'Completing Sale...' : 'Complete Sale'"></span>
-                                </button>
-                                <button
-                                    type="button"
-                                    @click="closeCheckoutModal()"
-                                    :disabled="isSubmittingCheckout"
-                                    class="inline-flex h-14 items-center justify-center rounded-2xl border border-slate-200 bg-white px-6 text-sm font-black uppercase tracking-wide text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                                >
-                                    Cancel
-                                </button>
+                        <button
+                            type="button"
+                            @click="submitCheckout()"
+                            :disabled="!canSubmitCheckout() || isSubmittingCheckout"
+                            class="mt-6 inline-flex h-14 w-full items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                        >
+                            <span x-text="isSubmittingCheckout ? 'Processing…' : 'Complete sale'"></span>
+                        </button>
+                    </div>
+                </aside>
+            </div>
+        </div>
+
+        <div
+            x-cloak
+            x-show="managerApproval.show"
+            x-transition.opacity
+            class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/55 px-4 py-4 backdrop-blur-sm"
+        >
+            <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Manager approval</p>
+                        <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Void current cart</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">Enter a manager or admin PIN to authorize this action.</p>
+                    </div>
+                    <button
+                        type="button"
+                        @click="closeManagerApproval()"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-slate-700 dark:hover:text-white"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="m6 6 12 12M6 18 18 6" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="mt-6">
+                    <label for="manager-pin" class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Manager PIN</label>
+                    <input
+                        id="manager-pin"
+                        x-ref="managerPinInput"
+                        x-model.trim="managerApproval.pin"
+                        @keydown.enter.prevent="submitManagerApproval()"
+                        type="password"
+                        inputmode="numeric"
+                        placeholder="Enter manager PIN"
+                        class="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-medium text-slate-950 outline-none shadow-sm transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:focus:border-emerald-400 dark:focus:bg-[#0b1220] dark:focus:ring-emerald-500/10"
+                    >
+                </div>
+
+                <div class="mt-6 grid gap-3 sm:grid-cols-2">
+                    <button
+                        type="button"
+                        @click="closeManagerApproval()"
+                        class="inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:text-slate-950 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700 dark:hover:text-white"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        @click="submitManagerApproval()"
+                        :disabled="managerApproval.busy"
+                        class="inline-flex h-12 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                    >
+                        <span x-text="managerApproval.busy ? 'Authorizing…' : 'Approve void'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div
+            x-cloak
+            x-show="!authenticated"
+            x-transition.opacity
+            class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 px-4 py-4 backdrop-blur-md"
+        >
+            <div class="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-[#0f172a]">
+                <div class="border-b border-slate-200 px-6 py-6 dark:border-slate-800">
+                    <div class="inline-flex items-center rounded-2xl bg-emerald-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                        Secure operator login
+                    </div>
+                    <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Unlock the register</h2>
+                    <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                        This console is intentionally blocked until a staff session is active. Sign in with a cashier or admin PIN to begin trading.
+                    </p>
+                </div>
+
+                <div class="grid gap-6 px-6 py-6">
+                    <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/60">
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Cashier demo</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-950 dark:text-white">Front Counter</p>
+                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">PIN: 0000</p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Admin demo</p>
+                                <p class="mt-2 text-sm font-semibold text-slate-950 dark:text-white">Admin Console</p>
+                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">PIN: 1234</p>
                             </div>
                         </div>
                     </div>
+
+                    <div>
+                        <label for="staff-pin" class="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-slate-400 dark:text-slate-500">Staff PIN</label>
+                        <input
+                            id="staff-pin"
+                            x-ref="loginPinInput"
+                            x-model.trim="login.pin"
+                            @keydown.enter.prevent="loginWithPin()"
+                            type="password"
+                            inputmode="numeric"
+                            placeholder="Enter staff PIN"
+                            class="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-lg font-medium tracking-[0.2em] text-slate-950 outline-none shadow-sm transition placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100 dark:border-slate-800 dark:bg-slate-900 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-emerald-400 dark:focus:bg-[#0b1220] dark:focus:ring-emerald-500/10"
+                        >
+                    </div>
+
+                    <button
+                        type="button"
+                        @click="loginWithPin()"
+                        :disabled="login.busy"
+                        class="inline-flex h-14 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300"
+                    >
+                        <span x-text="login.busy ? 'Signing in…' : 'Continue to console'"></span>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        function posEngine() {
+        function posConsole({ authenticated, user }) {
             return {
-                searchTerm: '',
-                cart: [],
-                livePayments: [],
-                selectedTransactionCode: null,
-                selectedLivePayment: null,
-                statusMessage: 'Ready for checkout.',
-                errorMessage: '',
+                authenticated,
+                user,
+                isDark: document.documentElement.classList.contains('dark'),
+                statusMessage: authenticated ? 'Cashier session active.' : 'Locked until staff PIN login.',
                 isBusy: false,
                 isSearching: false,
                 isSubmittingCheckout: false,
                 showCheckoutModal: false,
                 activePaymentTab: 'cash',
+                searchTerm: '',
+                searchResults: [],
+                cart: [],
+                livePayments: [],
+                selectedTransactionCode: null,
+                selectedLivePayment: null,
+                hasSearched: false,
+                quickSearchTerms: ['Mac', 'AirPods', 'Coffee', 'Tesla', 'Matcha', 'Lamp'],
+                toasts: [],
+                toastCounter: 0,
                 liveFeedTimer: null,
-                isDark: document.documentElement.classList.contains('dark'),
-                quickAddItems: [
-                    'Bread',
-                    'Milk',
-                    'Sugar',
-                    'Soda',
-                    'Water',
-                    'Cooking Oil',
-                    'Rice',
-                    'Soap',
-                ],
                 cashTendered: 0,
                 cashPresets: [],
+                login: {
+                    pin: '',
+                    busy: false,
+                },
+                managerApproval: {
+                    show: false,
+                    pin: '',
+                    busy: false,
+                },
                 stk: {
                     phone: '',
                     checkoutRequestId: '',
@@ -586,11 +942,11 @@
                     pollTimer: null,
                 },
 
-                init() {
+                boot() {
                     this.cashTendered = this.roundMoney(this.grandTotal);
                     this.refreshCashPresets();
                     this.fetchLivePayments();
-                    this.liveFeedTimer = window.setInterval(() => this.fetchLivePayments(), 3000);
+                    this.liveFeedTimer = window.setInterval(() => this.fetchLivePayments(), 5000);
 
                     this.$watch('grandTotal', () => {
                         this.refreshCashPresets();
@@ -601,8 +957,16 @@
                     });
 
                     this.$nextTick(() => {
-                        this.$refs.searchInput.focus();
+                        if (this.authenticated) {
+                            this.focusSearchInput();
+                        } else {
+                            this.focusLoginInput();
+                        }
                     });
+                },
+
+                get totalItems() {
+                    return this.roundMoney(this.cart.reduce((sum, item) => sum + Number(item.quantity), 0));
                 },
 
                 get subtotal() {
@@ -624,6 +988,18 @@
                     return this.roundMoney(Number(this.cashTendered || 0) - this.grandTotal);
                 },
 
+                get hasParkedCart() {
+                    return localStorage.getItem('duka-parked-cart') !== null;
+                },
+
+                focusSearchInput() {
+                    this.$nextTick(() => this.$refs.searchInput?.focus());
+                },
+
+                focusLoginInput() {
+                    this.$nextTick(() => this.$refs.loginPinInput?.focus());
+                },
+
                 toggleTheme() {
                     this.isDark = !this.isDark;
                     document.documentElement.classList.toggle('dark', this.isDark);
@@ -631,6 +1007,10 @@
                 },
 
                 handleGlobalKeydown(event) {
+                    if (!this.authenticated) {
+                        return;
+                    }
+
                     if (event.key === 'F2') {
                         event.preventDefault();
                         this.openCheckoutModal();
@@ -639,7 +1019,7 @@
 
                     if (event.key === 'F4') {
                         event.preventDefault();
-                        this.promptVoidCart();
+                        this.openManagerApproval();
                         return;
                     }
 
@@ -651,14 +1031,23 @@
 
                     if (event.key === 'Escape') {
                         event.preventDefault();
-                        this.closeCheckoutModal();
+
+                        if (this.managerApproval.show) {
+                            this.closeManagerApproval();
+                            return;
+                        }
+
+                        if (this.showCheckoutModal) {
+                            this.closeCheckoutModal();
+                        }
+
                         return;
                     }
 
                     if (event.code === 'Space' && !this.shouldIgnoreGlobalSpace(event.target)) {
                         event.preventDefault();
-                        this.$refs.searchInput.focus();
-                        this.$refs.searchInput.select();
+                        this.focusSearchInput();
+                        this.$refs.searchInput?.select();
                     }
                 },
 
@@ -669,11 +1058,19 @@
 
                     const tagName = target.tagName ? target.tagName.toLowerCase() : '';
 
-                    return tagName === 'input' || tagName === 'textarea' || target.isContentEditable;
+                    return ['input', 'textarea', 'button'].includes(tagName) || target.isContentEditable;
                 },
 
                 csrfToken() {
                     return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                },
+
+                updateCsrfToken(token) {
+                    const meta = document.querySelector('meta[name="csrf-token"]');
+
+                    if (meta) {
+                        meta.setAttribute('content', token);
+                    }
                 },
 
                 postHeaders() {
@@ -684,16 +1081,109 @@
                     };
                 },
 
-                async searchProduct(forcedQuery = null) {
-                    const query = String(forcedQuery ?? this.searchTerm).trim();
+                async parseJson(response) {
+                    const text = await response.text();
 
-                    if (!query || this.isSearching) {
+                    if (!text) {
+                        return {};
+                    }
+
+                    try {
+                        return JSON.parse(text);
+                    } catch (error) {
+                        return {};
+                    }
+                },
+
+                handleUnauthorized(payload) {
+                    this.authenticated = false;
+                    this.user = null;
+                    this.showCheckoutModal = false;
+                    this.managerApproval.show = false;
+                    this.statusMessage = 'Session expired. Sign in again to continue.';
+                    this.toast('error', 'Session required', payload.message || 'Your cashier session is no longer active.');
+                    this.focusLoginInput();
+                },
+
+                toast(variant, title, message) {
+                    const id = ++this.toastCounter;
+                    this.toasts.push({ id, variant, title, message });
+
+                    window.setTimeout(() => this.dismissToast(id), 4200);
+                },
+
+                dismissToast(id) {
+                    this.toasts = this.toasts.filter((toast) => toast.id !== id);
+                },
+
+                async loginWithPin() {
+                    if (this.login.busy) {
                         return;
                     }
 
-                    this.errorMessage = '';
-                    this.statusMessage = 'Searching products...';
+                    const pin = this.login.pin.trim();
+
+                    if (!pin) {
+                        this.toast('error', 'PIN required', 'Enter a staff PIN to unlock the register.');
+                        return;
+                    }
+
+                    this.login.busy = true;
+
+                    try {
+                        const response = await fetch('/api/login-pin', {
+                            method: 'POST',
+                            headers: this.postHeaders(),
+                            body: JSON.stringify({ pin }),
+                            credentials: 'same-origin',
+                        });
+
+                        const payload = await this.parseJson(response);
+
+                        if (!response.ok) {
+                            throw new Error(payload.message || 'Unable to authenticate with that PIN.');
+                        }
+
+                        this.authenticated = true;
+                        this.user = payload.user || null;
+                        this.login.pin = '';
+                        this.statusMessage = `Signed in as ${this.user?.name ?? 'staff'}.`;
+
+                        if (payload.csrf_token) {
+                            this.updateCsrfToken(payload.csrf_token);
+                        }
+
+                        this.toast('success', 'Welcome back', payload.message || 'Cashier session activated.');
+                        this.focusSearchInput();
+                    } catch (error) {
+                        this.toast('error', 'Login failed', error.message || 'Unable to authenticate with that PIN.');
+                    } finally {
+                        this.login.busy = false;
+                    }
+                },
+
+                async searchProducts(forcedQuery = null) {
+                    if (!this.authenticated) {
+                        this.toast('info', 'Sign in first', 'Unlock the register before searching inventory.');
+                        this.focusLoginInput();
+                        return;
+                    }
+
+                    const query = String(forcedQuery ?? this.searchTerm).trim();
+
+                    if (!query || this.isSearching) {
+                        if (!query) {
+                            this.searchResults = [];
+                            this.hasSearched = false;
+                            this.statusMessage = 'Ready to scan.';
+                        }
+
+                        return;
+                    }
+
                     this.isSearching = true;
+                    this.hasSearched = true;
+                    this.statusMessage = `Searching inventory for “${query}”…`;
 
                     try {
                         const response = await fetch('/api/pos/search', {
@@ -703,38 +1193,36 @@
                             credentials: 'same-origin',
                         });
 
-                        const payload = await response.json();
+                        const payload = await this.parseJson(response);
 
                         if (!response.ok) {
                             throw new Error(payload.message || 'Product search failed.');
                         }
 
-                        if (!Array.isArray(payload) || payload.length === 0) {
-                            throw new Error('No matching product found.');
-                        }
-
-                        this.addProductToCart(payload[0]);
-                        this.searchTerm = '';
-                        this.errorMessage = '';
-                        this.statusMessage = `${payload[0].name} added to cart.`;
+                        this.searchResults = Array.isArray(payload) ? payload : [];
+                        this.searchTerm = query;
+                        this.statusMessage = this.searchResults.length > 0
+                            ? `${this.searchResults.length} matching product${this.searchResults.length === 1 ? '' : 's'} found.`
+                            : 'Ready to scan.';
                     } catch (error) {
-                        this.errorMessage = error.message || 'Product search failed.';
-                        alert(this.errorMessage);
+                        this.searchResults = [];
+                        this.toast('error', 'Search failed', error.message || 'Product search failed.');
                     } finally {
                         this.isSearching = false;
-                        this.$nextTick(() => this.$refs.searchInput.focus());
                     }
                 },
 
-                quickAdd(itemName) {
-                    this.searchProduct(itemName);
-                },
-
                 addProductToCart(product) {
+                    if (!this.authenticated) {
+                        this.toast('info', 'Sign in first', 'Unlock the register before modifying the cart.');
+                        return;
+                    }
+
                     const existingItem = this.cart.find((item) => item.product_id === product.id);
 
                     if (existingItem) {
                         this.incrementQty(product.id);
+                        this.toast('success', 'Cart updated', `${product.name} quantity increased.`);
                         return;
                     }
 
@@ -746,6 +1234,9 @@
                         unit_price: this.roundMoney(product.base_price),
                         tax_rate: Number(product.tax_category?.rate ?? 0),
                     });
+
+                    this.statusMessage = `${product.name} added to cart.`;
+                    this.toast('success', 'Added to cart', `${product.name} is ready for checkout.`);
                 },
 
                 incrementQty(productId) {
@@ -756,6 +1247,7 @@
                     }
 
                     item.quantity = this.roundMoney(Number(item.quantity) + 1);
+                    this.statusMessage = `${item.name} quantity updated.`;
                 },
 
                 decrementQty(productId) {
@@ -771,11 +1263,18 @@
                     }
 
                     item.quantity = this.roundMoney(Number(item.quantity) - 1);
+                    this.statusMessage = `${item.name} quantity updated.`;
                 },
 
                 removeItem(productId) {
-                    this.cart = this.cart.filter((item) => item.product_id !== productId);
-                    this.statusMessage = this.cart.length === 0 ? 'Cart cleared.' : 'Item removed from cart.';
+                    const item = this.cart.find((entry) => entry.product_id === productId);
+                    this.cart = this.cart.filter((entry) => entry.product_id !== productId);
+
+                    if (item) {
+                        this.toast('info', 'Removed from cart', `${item.name} was removed from the sale.`);
+                    }
+
+                    this.statusMessage = this.cart.length === 0 ? 'Cart cleared.' : 'Cart updated.';
                 },
 
                 async fetchLivePayments() {
@@ -788,7 +1287,7 @@
                             credentials: 'same-origin',
                         });
 
-                        const payload = await response.json();
+                        const payload = await this.parseJson(response);
 
                         if (!response.ok) {
                             throw new Error(payload.message || 'Unable to fetch live till feed.');
@@ -798,12 +1297,8 @@
 
                         if (this.selectedTransactionCode) {
                             const stillPresent = this.livePayments.find((payment) => payment.transaction_code === this.selectedTransactionCode);
-
-                            if (stillPresent) {
-                                this.selectedLivePayment = stillPresent;
-                            } else {
-                                this.clearSelectedLivePayment();
-                            }
+                            this.selectedLivePayment = stillPresent ?? null;
+                            this.selectedTransactionCode = stillPresent ? this.selectedTransactionCode : null;
                         }
                     } catch (error) {
                         console.error(error);
@@ -815,8 +1310,7 @@
                     this.selectedLivePayment = payment;
                     this.activePaymentTab = 'live-feed';
                     this.showCheckoutModal = true;
-                    this.errorMessage = '';
-                    this.statusMessage = `Linked ${payment.customer_name}'s M-PESA payment.`;
+                    this.statusMessage = `Linked ${payment.customer_name}'s payment to the current sale.`;
                 },
 
                 clearSelectedLivePayment() {
@@ -825,8 +1319,14 @@
                 },
 
                 openCheckoutModal() {
+                    if (!this.authenticated) {
+                        this.toast('info', 'Sign in first', 'Unlock the register before taking payment.');
+                        this.focusLoginInput();
+                        return;
+                    }
+
                     if (this.cart.length === 0) {
-                        alert('Add at least one item to the cart before checkout.');
+                        this.toast('info', 'Cart is empty', 'Add at least one item before opening checkout.');
                         return;
                     }
 
@@ -871,14 +1371,13 @@
                     }
 
                     if (!this.stk.phone.trim()) {
-                        alert('Enter the customer phone number for STK Push.');
+                        this.toast('error', 'Phone number required', 'Enter a customer phone number before initiating STK push.');
                         return;
                     }
 
-                    this.errorMessage = '';
                     this.stk.isSubmitting = true;
                     this.stk.statusLabel = 'Initiating';
-                    this.stk.statusMessage = 'Sending STK request to Daraja...';
+                    this.stk.statusMessage = 'Sending STK request to Daraja…';
                     this.stk.checkoutRequestId = '';
                     this.stk.statusPayload = null;
 
@@ -894,7 +1393,12 @@
                             credentials: 'same-origin',
                         });
 
-                        const payload = await response.json();
+                        const payload = await this.parseJson(response);
+
+                        if (response.status === 401) {
+                            this.handleUnauthorized(payload);
+                            return;
+                        }
 
                         if (!response.ok) {
                             throw new Error(payload.message || 'Unable to initiate STK push.');
@@ -902,12 +1406,13 @@
 
                         this.stk.checkoutRequestId = payload.checkout_request_id;
                         this.stk.statusLabel = 'Pending';
-                        this.stk.statusMessage = 'STK prompt sent. Waiting for customer confirmation...';
+                        this.stk.statusMessage = 'STK prompt sent. Waiting for customer confirmation…';
                         this.beginStkPolling();
+                        this.toast('success', 'STK sent', 'The customer should now see a payment prompt on their phone.');
                     } catch (error) {
                         this.stk.statusLabel = 'Failed';
                         this.stk.statusMessage = error.message || 'Unable to initiate STK push.';
-                        alert(this.stk.statusMessage);
+                        this.toast('error', 'STK failed', this.stk.statusMessage);
                     } finally {
                         this.stk.isSubmitting = false;
                     }
@@ -948,7 +1453,12 @@
                             credentials: 'same-origin',
                         });
 
-                        const payload = await response.json();
+                        const payload = await this.parseJson(response);
+
+                        if (response.status === 401) {
+                            this.handleUnauthorized(payload);
+                            return;
+                        }
 
                         if (!response.ok) {
                             throw new Error(payload.message || 'Unable to check STK status.');
@@ -959,14 +1469,18 @@
                         this.stk.statusLabel = normalized.label;
                         this.stk.statusMessage = normalized.message;
 
-                        if (normalized.state === 'completed' || normalized.state === 'failed') {
+                        if (normalized.state === 'completed') {
+                            this.toast('success', 'Payment confirmed', normalized.message || 'M-PESA payment completed successfully.');
+                            this.stopStkPolling();
+                        } else if (normalized.state === 'failed') {
+                            this.toast('error', 'Payment failed', normalized.message || 'M-PESA payment failed.');
                             this.stopStkPolling();
                         }
                     } catch (error) {
                         this.stk.statusLabel = 'Failed';
                         this.stk.statusMessage = error.message || 'Unable to check STK status.';
                         this.stopStkPolling();
-                        alert(this.stk.statusMessage);
+                        this.toast('error', 'STK status failed', this.stk.statusMessage);
                     }
                 },
 
@@ -1009,18 +1523,18 @@
 
                 stkStatusClass() {
                     if (this.stk.statusLabel === 'Completed') {
-                        return 'text-green-600 dark:text-green-400';
+                        return 'text-emerald-600 dark:text-emerald-300';
                     }
 
                     if (this.stk.statusLabel === 'Failed') {
-                        return 'text-red-600 dark:text-red-400';
+                        return 'text-red-600 dark:text-red-300';
                     }
 
-                    return 'text-yellow-600 dark:text-yellow-400';
+                    return 'text-amber-600 dark:text-amber-300';
                 },
 
                 canSubmitCheckout() {
-                    if (this.cart.length === 0) {
+                    if (this.cart.length === 0 || !this.authenticated) {
                         return false;
                     }
 
@@ -1085,8 +1599,7 @@
                     }
 
                     this.isSubmittingCheckout = true;
-                    this.errorMessage = '';
-                    this.statusMessage = 'Submitting checkout...';
+                    this.statusMessage = 'Submitting sale…';
 
                     try {
                         const response = await fetch('/api/pos/checkout', {
@@ -1096,18 +1609,23 @@
                             credentials: 'same-origin',
                         });
 
-                        const payload = await response.json();
+                        const payload = await this.parseJson(response);
+
+                        if (response.status === 401) {
+                            this.handleUnauthorized(payload);
+                            return;
+                        }
 
                         if (!response.ok) {
                             throw new Error(payload.message || 'Checkout failed.');
                         }
 
-                        alert(`Payment successful. Receipt: ${payload.receipt_number}`);
+                        this.toast('success', 'Sale completed', `Receipt ${payload.receipt_number} generated successfully.`);
                         this.clearCartStateAfterSuccess();
                         this.statusMessage = 'Checkout completed successfully.';
                     } catch (error) {
-                        this.errorMessage = error.message || 'Checkout failed.';
-                        alert(this.errorMessage);
+                        this.toast('error', 'Checkout failed', error.message || 'Checkout failed.');
+                        this.statusMessage = 'Checkout failed.';
                     } finally {
                         this.isSubmittingCheckout = false;
                     }
@@ -1117,12 +1635,14 @@
                     this.cart = [];
                     this.cashTendered = 0;
                     this.searchTerm = '';
+                    this.searchResults = [];
+                    this.hasSearched = false;
                     this.clearSelectedLivePayment();
                     this.resetStkState();
                     this.closeCheckoutModal();
                     localStorage.removeItem('duka-parked-cart');
                     this.fetchLivePayments();
-                    this.$nextTick(() => this.$refs.searchInput.focus());
+                    this.focusSearchInput();
                 },
 
                 resetStkState() {
@@ -1135,17 +1655,33 @@
                     this.stk.isSubmitting = false;
                 },
 
-                async promptVoidCart() {
+                openManagerApproval() {
+                    if (!this.authenticated) {
+                        this.toast('info', 'Sign in first', 'Unlock the register before requesting manager approval.');
+                        this.focusLoginInput();
+                        return;
+                    }
+
                     if (this.cart.length === 0 || this.isBusy) {
                         return;
                     }
 
-                    const managerPin = window.prompt('Manager PIN required to void the current cart:');
+                    this.managerApproval.show = true;
+                    this.managerApproval.pin = '';
+                    this.$nextTick(() => this.$refs.managerPinInput?.focus());
+                },
 
-                    if (!managerPin) {
+                closeManagerApproval() {
+                    this.managerApproval.show = false;
+                    this.managerApproval.pin = '';
+                },
+
+                async submitManagerApproval() {
+                    if (!this.managerApproval.pin.trim() || this.managerApproval.busy) {
                         return;
                     }
 
+                    this.managerApproval.busy = true;
                     this.isBusy = true;
 
                     try {
@@ -1153,14 +1689,19 @@
                             method: 'POST',
                             headers: this.postHeaders(),
                             body: JSON.stringify({
-                                manager_pin: managerPin,
+                                manager_pin: this.managerApproval.pin.trim(),
                                 action: 'void_cart',
                                 reference_id: null,
                             }),
                             credentials: 'same-origin',
                         });
 
-                        const payload = await response.json();
+                        const payload = await this.parseJson(response);
+
+                        if (response.status === 401) {
+                            this.handleUnauthorized(payload);
+                            return;
+                        }
 
                         if (!response.ok) {
                             throw new Error(payload.message || 'Manager approval failed.');
@@ -1168,15 +1709,15 @@
 
                         this.cart = [];
                         this.closeCheckoutModal();
-                        this.errorMessage = '';
+                        this.closeManagerApproval();
                         this.statusMessage = 'Cart voided with manager approval.';
-                        alert('Cart voided.');
+                        this.toast('success', 'Cart voided', `${payload.approved_by?.name ?? 'Manager'} approved the void.`);
+                        this.focusSearchInput();
                     } catch (error) {
-                        this.errorMessage = error.message || 'Manager approval failed.';
-                        alert(this.errorMessage);
+                        this.toast('error', 'Approval failed', error.message || 'Manager approval failed.');
                     } finally {
+                        this.managerApproval.busy = false;
                         this.isBusy = false;
-                        this.$nextTick(() => this.$refs.searchInput.focus());
                     }
                 },
 
@@ -1194,8 +1735,25 @@
                     this.cart = [];
                     this.closeCheckoutModal();
                     this.statusMessage = 'Cart parked locally on this device.';
-                    alert('Cart parked locally.');
-                    this.$nextTick(() => this.$refs.searchInput.focus());
+                    this.toast('success', 'Cart parked', 'The current sale was stored locally for later recovery.');
+                    this.focusSearchInput();
+                },
+
+                restoreParkedCart() {
+                    const snapshot = localStorage.getItem('duka-parked-cart');
+
+                    if (!snapshot) {
+                        return;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(snapshot);
+                        this.cart = Array.isArray(parsed.cart) ? parsed.cart : [];
+                        this.statusMessage = 'Parked cart restored.';
+                        this.toast('success', 'Cart restored', 'The parked sale is back on screen.');
+                    } catch (error) {
+                        this.toast('error', 'Restore failed', 'The parked cart could not be restored.');
+                    }
                 },
 
                 formatCurrency(value) {
@@ -1208,6 +1766,7 @@
 
                 formatQuantity(value) {
                     const numericValue = Number(value);
+
                     return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(2);
                 },
 

@@ -23,6 +23,8 @@ Route::prefix('api/pos')->group(function (): void {
 });
 
 Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
+Route::post('/api/login-pin', [SecurityApiController::class, 'pinLogin'])
+    ->middleware('throttle:pin-login');
 
 Route::prefix('api/auth')->group(function (): void {
     Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
