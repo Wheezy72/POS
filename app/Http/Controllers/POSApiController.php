@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Jobs\SyncSaleToCloud;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
@@ -158,6 +159,8 @@ class POSApiController extends Controller
                         'status' => $paymentData['status'] ?? 'completed',
                     ]);
                 }
+
+                SyncSaleToCloud::dispatch($sale)->afterCommit();
 
                 return $sale->load([
                     'customer',

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\AdminApiController;
 use App\Http\Controllers\POSApiController;
 use App\Http\Controllers\SecurityApiController;
 use Illuminate\Support\Facades\Route;
@@ -16,11 +17,20 @@ Route::prefix('api/pos')->group(function (): void {
 });
 
 Route::prefix('api/auth')->group(function (): void {
-    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin']);
+    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
+        ->middleware('throttle:pin-login');
 });
 
 Route::middleware('auth')->group(function (): void {
-    Route::post('/api/auth/manager-override', [SecurityApiController::class, 'managerOverride']);
+    Route::post('/api/auth/manager-override', [SecurityApiController::class, 'managerOverride'])
+        ->middleware('throttle:manager-override');
     Route::post('/api/shifts/open', [SecurityApiController::class, 'openShift']);
     Route::post('/api/shifts/close', [SecurityApiController::class, 'closeShift']);
+});
+
+Route::middleware(['auth', 'role:admin,manager'])->prefix('api/admin')->group(function (): void {
+    Route::post('/products', [AdminApiController::class, 'storeProduct']);
+    Route::put('/products/{id}', [AdminApiController::class, 'updateProduct']);
+    Route::post('/cashiers', [AdminApiController::class, 'storeCashier']);
+    Route::get('/reports/daily-summary', [AdminApiController::class, 'dailySummary']);
 });

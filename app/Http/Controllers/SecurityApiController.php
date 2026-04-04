@@ -39,6 +39,7 @@ class SecurityApiController extends Controller
         // offline-friendly option even when the API is consumed by a local device.
         Auth::login($user);
         $request->session()->regenerate();
+        $request->session()->regenerateToken();
 
         AuditLog::query()->create([
             'user_id' => $user->id,
