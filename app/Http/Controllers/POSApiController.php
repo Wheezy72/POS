@@ -102,6 +102,7 @@ class POSApiController extends Controller
                 $subtotal = 0.0;
                 $taxTotal = 0.0;
                 $lineItems = [];
+                $pricingAdjustments = [];
 
                 foreach ($validated['cart'] as $cartItem) {
                     /** @var Product|null $product */
@@ -125,6 +126,8 @@ class POSApiController extends Controller
 
                     $basePrice = round((float) $product->base_price, 2);
                     $costPrice = round((float) $product->cost_price, 2);
+                    $originalUnitPrice = $basePrice;
+                    $priceSource = 'base_price';
 
                     // Rule 1: expiry-driven markdowns.
                     // If the batch expires within 48 hours, the engine automatically cuts the shelf
@@ -133,6 +136,7 @@ class POSApiController extends Controller
 
                     if ($this->expiresWithin48Hours($product->batch_expiry_date)) {
                         $unitPrice = round($basePrice * 0.5, 2);
+                        $priceSource = 'expiry_markdown';
                     }
 
                     // Rule 2: time-decay margin floors.
@@ -153,13 +157,30 @@ class POSApiController extends Controller
                     // The pricing engine always wins over any stale frontend assumption. If the
                     // calculated promotional price falls below the allowed floor, we clamp it back
                     // up to the minimum safe value unless a valid manager PIN override was supplied.
+                    $marginClampApplied = false;
+
                     if (! $managerOverrideApproved && $unitPrice < $marginFloor) {
                         $unitPrice = $marginFloor;
+                        $marginClampApplied = true;
+                        $priceSource = 'margin_floor';
                     }
 
                     $unitPrice = round($unitPrice, 2);
                     $lineSubtotal = round($quantity * $unitPrice, 2);
                     $lineTax = round($lineSubtotal * (((float) $product->taxCategory->rate) / 100), 2);
+
+                    if ($unitPrice !== $originalUnitPrice || $marginClampApplied) {
+                        $pricingAdjustments[] = [
+                            'product_id' => $product->id,
+                            'product_name' => $product->name,
+                            'quantity' => $quantity,
+                            'base_unit_price' => $basePrice,
+                            'final_unit_price' => $unitPrice,
+                            'margin_floor' => $marginFloor,
+                            'price_source' => $priceSource,
+                            'manager_override_used' => $managerOverrideApproved,
+                        ];
+                    }
 
                     $subtotal += $lineSubtotal;
                     $taxTotal += $lineTax;
@@ -260,7 +281,7 @@ class POSApiController extends Controller
                     'customer',
                     'saleItems.product.taxCategory',
                     'payments',
-                ]);
+                ])->setRelation('pricingAdjustments', collect($pricingAdjustments));
             });
         } catch (RuntimeException $exception) {
             return response()->json([
@@ -278,6 +299,7 @@ class POSApiController extends Controller
             'message' => 'Checkout completed successfully.',
             'receipt_number' => $sale->receipt_number,
             'sale' => $sale,
+            'pricing_adjustments' => $sale->getRelation('pricingAdjustments'),
         ], 201);
     }
 

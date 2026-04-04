@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
 Route::view('/pos', 'pos-checkout');
+Route::view('/dashboard', 'admin.dashboard');
 
 Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
@@ -46,6 +47,7 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('api/admin')->group(fu
 });
 
 Route::middleware(['auth', 'role:admin'])->prefix('api/admin/reports')->group(function (): void {
+    Route::get('/dashboard-overview', [AdminApiController::class, 'dashboardOverview']);
     Route::get('/inventory-velocity', [AdminApiController::class, 'inventoryVelocity']);
     Route::get('/margin-bleed', [AdminApiController::class, 'marginBleed']);
     Route::get('/peak-hours', [AdminApiController::class, 'peakHours']);
