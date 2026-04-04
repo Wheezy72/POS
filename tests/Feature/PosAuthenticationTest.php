@@ -48,4 +48,47 @@ class PosAuthenticationTest extends TestCase
         ]);
         $this->assertAuthenticatedAs($user);
     }
+
+    public function test_admin_cannot_log_in_through_the_pos_pin_endpoint(): void
+    {
+        User::query()->create([
+            'name' => 'Admin Console',
+            'email' => 'admin@example.com',
+            'password' => 'secret-password',
+            'pin' => '1234',
+            'role' => 'admin',
+        ]);
+
+        $response = $this->postJson('/api/login-pin', [
+            'pin' => '1234',
+        ]);
+
+        $response->assertForbidden();
+        $response->assertJson([
+            'message' => 'Only cashier accounts can open the POS register.',
+        ]);
+        $this->assertGuest();
+    }
+
+    public function test_admin_cannot_access_cashier_pos_endpoints(): void
+    {
+        $admin = User::query()->create([
+            'name' => 'Admin Console',
+            'email' => 'admin@example.com',
+            'password' => 'secret-password',
+            'pin' => '1234',
+            'role' => 'admin',
+        ]);
+
+        $response = $this
+            ->actingAs($admin)
+            ->postJson('/api/pos/search', [
+                'query' => 'Mac',
+            ]);
+
+        $response->assertForbidden();
+        $response->assertJson([
+            'message' => 'You do not have permission to perform this action.',
+        ]);
+    }
 }
