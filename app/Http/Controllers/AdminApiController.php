@@ -168,6 +168,118 @@ class AdminApiController extends Controller
         ]);
     }
 
+    public function dashboardOverview(): JsonResponse
+    {
+        $startOfWindow = now()->subDays(6)->startOfDay();
+        $endOfWindow = now()->endOfDay();
+        $hourBucketExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%H', created_at)"
+            : 'LPAD(HOUR(created_at), 2, "0")';
+
+        $dailyFinancials = SaleItem::query()
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->join('products', 'products.id', '=', 'sale_items.product_id')
+            ->where('sales.status', 'completed')
+            ->whereBetween('sales.created_at', [$startOfWindow, $endOfWindow])
+            ->selectRaw("date(sales.created_at) as day_bucket")
+            ->selectRaw('ROUND(SUM(sale_items.subtotal), 2) as revenue')
+            ->selectRaw('ROUND(SUM((sale_items.unit_price - products.cost_price) * sale_items.quantity), 2) as profit')
+            ->groupBy('day_bucket')
+            ->orderBy('day_bucket')
+            ->get()
+            ->keyBy('day_bucket');
+
+        $chartLabels = [];
+        $revenueSeries = [];
+        $profitSeries = [];
+
+        foreach (range(6, 0) as $dayOffset) {
+            $day = now()->subDays($dayOffset)->toDateString();
+            $chartLabels[] = now()->subDays($dayOffset)->format('D');
+            $revenueSeries[] = round((float) ($dailyFinancials[$day]->revenue ?? 0), 2);
+            $profitSeries[] = round((float) ($dailyFinancials[$day]->profit ?? 0), 2);
+        }
+
+        $soldQuantities = SaleItem::query()
+            ->select('product_id', DB::raw('SUM(quantity) as total_quantity_sold'))
+            ->whereHas('sale', function ($builder) use ($startOfWindow, $endOfWindow) {
+                $builder
+                    ->where('status', 'completed')
+                    ->whereBetween('created_at', [$startOfWindow, $endOfWindow]);
+            })
+            ->groupBy('product_id')
+            ->pluck('total_quantity_sold', 'product_id');
+
+        $criticalAlerts = Product::query()
+            ->orderBy('name')
+            ->get()
+            ->map(function (Product $product) use ($soldQuantities) {
+                $quantitySold = round((float) ($soldQuantities[$product->id] ?? 0), 2);
+                $averageDailySold = round($quantitySold / 7, 2);
+                $runwayDays = $averageDailySold > 0
+                    ? round(((float) $product->stock_quantity) / $averageDailySold, 2)
+                    : null;
+
+                return [
+                    'name' => $product->name,
+                    'sku' => $product->sku,
+                    'stock_quantity' => round((float) $product->stock_quantity, 2),
+                    'average_daily_quantity_sold' => $averageDailySold,
+                    'runway_days' => $runwayDays,
+                ];
+            })
+            ->filter(fn (array $product): bool => $product['runway_days'] !== null && $product['runway_days'] < 3)
+            ->sortBy('runway_days')
+            ->take(6)
+            ->values();
+
+        $hourlyFinancials = Sale::query()
+            ->where('status', 'completed')
+            ->whereBetween('created_at', [now()->subDays(30)->startOfDay(), now()->endOfDay()])
+            ->selectRaw("{$hourBucketExpression} as hour_bucket")
+            ->selectRaw('ROUND(SUM(grand_total), 2) as total_revenue')
+            ->groupBy('hour_bucket')
+            ->orderBy('hour_bucket')
+            ->get()
+            ->keyBy('hour_bucket');
+
+        $hourLabels = [];
+        $hourRevenueSeries = [];
+
+        foreach (range(0, 23) as $hour) {
+            $bucket = str_pad((string) $hour, 2, '0', STR_PAD_LEFT);
+            $hourLabels[] = $bucket . ':00';
+            $hourRevenueSeries[] = round((float) ($hourlyFinancials[$bucket]->total_revenue ?? 0), 2);
+        }
+
+        $monthFinancials = SaleItem::query()
+            ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
+            ->join('products', 'products.id', '=', 'sale_items.product_id')
+            ->where('sales.status', 'completed')
+            ->whereBetween('sales.created_at', [now()->startOfMonth(), now()->endOfMonth()])
+            ->selectRaw('ROUND(SUM(sale_items.subtotal), 2) as revenue')
+            ->selectRaw('ROUND(SUM((sale_items.unit_price - products.cost_price) * sale_items.quantity), 2) as profit')
+            ->first();
+
+        return response()->json([
+            'kpis' => [
+                'month_revenue' => round((float) ($monthFinancials?->revenue ?? 0), 2),
+                'month_profit' => round((float) ($monthFinancials?->profit ?? 0), 2),
+                'critical_alert_count' => $criticalAlerts->count(),
+            ],
+            'profit_vs_revenue' => [
+                'labels' => $chartLabels,
+                'revenue' => $revenueSeries,
+                'profit' => $profitSeries,
+            ],
+            'critical_alerts' => $criticalAlerts,
+            'hourly_heatmap' => [
+                'labels' => $hourLabels,
+                'revenue' => $hourRevenueSeries,
+            ],
+        ]);
+    }
+
     public function inventoryVelocity(): JsonResponse
     {
         $startOfWindow = now()->subDays(7)->startOfDay();
