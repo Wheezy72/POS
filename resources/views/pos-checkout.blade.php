@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Duka-App POS</title>
+    <script>
+        const storedTheme = localStorage.getItem('duka-theme');
+
+        if (storedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+
+        window.tailwind = window.tailwind || {};
+        window.tailwind.config = {
+            darkMode: 'class',
+        };
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
@@ -189,10 +201,15 @@
                 ],
 
                 init() {
+                    this.theme = localStorage.getItem('duka-theme') || 'light';
+                    this.applyTheme();
+
                     this.$nextTick(() => {
                         this.$refs.searchInput.focus();
                     });
                 },
+
+                theme: 'light',
 
                 get subtotal() {
                     return this.cart.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
@@ -405,6 +422,10 @@
 
                 roundMoney(value) {
                     return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+                },
+
+                applyTheme() {
+                    document.documentElement.classList.toggle('dark', this.theme === 'dark');
                 },
             };
         }

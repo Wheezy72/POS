@@ -9,9 +9,13 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\User;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -44,6 +48,7 @@ class POSApiController extends Controller
     {
         $validated = $request->validate([
             'customer_id' => ['nullable', 'uuid'],
+            'manager_pin' => ['nullable', 'string', 'regex:/^\d{4}(\d{2})?$/'],
             'cart' => ['required', 'array', 'min:1'],
             'cart.*.product_id' => ['required', 'uuid'],
             'cart.*.quantity' => ['required', 'numeric', 'gt:0'],
@@ -62,8 +67,10 @@ class POSApiController extends Controller
             ], 401);
         }
 
+        $managerOverrideApproved = $this->hasValidManagerOverride($validated['manager_pin'] ?? null);
+
         try {
-            $sale = DB::transaction(function () use ($validated, $cashierId): Sale {
+            $sale = DB::transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
                 $productIds = collect($validated['cart'])
                     ->pluck('product_id')
                     ->unique()
@@ -78,6 +85,7 @@ class POSApiController extends Controller
 
                 $subtotal = 0.0;
                 $taxTotal = 0.0;
+                $lineItems = [];
 
                 foreach ($validated['cart'] as $cartItem) {
                     /** @var Product|null $product */
@@ -99,20 +107,70 @@ class POSApiController extends Controller
                         throw new RuntimeException("Insufficient stock for product {$product->name}.");
                     }
 
-                    $unitPrice = round((float) $product->base_price, 2);
+                    $basePrice = round((float) $product->base_price, 2);
+                    $costPrice = round((float) $product->cost_price, 2);
+
+                    // Rule 1: expiry-driven markdowns.
+                    // If the batch expires within 48 hours, the engine automatically cuts the shelf
+                    // price by 50% to improve sell-through before the stock becomes waste.
+                    $unitPrice = $basePrice;
+
+                    if ($this->expiresWithin48Hours($product->batch_expiry_date)) {
+                        $unitPrice = round($basePrice * 0.5, 2);
+                    }
+
+                    // Rule 2: time-decay margin floors.
+                    // Older stock is allowed to break margin more aggressively so dead inventory can
+                    // be converted back into cash instead of sitting on the shelf indefinitely.
+                    $daysSinceLastReceived = $this->daysSinceLastReceived($product->last_received_date);
+                    $marginFloorMultiplier = 1.15;
+
+                    if ($daysSinceLastReceived > 120) {
+                        $marginFloorMultiplier = 1.00;
+                    } elseif ($daysSinceLastReceived > 90) {
+                        $marginFloorMultiplier = 1.05;
+                    }
+
+                    $marginFloor = round($costPrice * $marginFloorMultiplier, 2);
+
+                    // Rule 3: dynamic margin shield.
+                    // The pricing engine always wins over any stale frontend assumption. If the
+                    // calculated promotional price falls below the allowed floor, we clamp it back
+                    // up to the minimum safe value unless a valid manager PIN override was supplied.
+                    if (! $managerOverrideApproved && $unitPrice < $marginFloor) {
+                        $unitPrice = $marginFloor;
+                    }
+
+                    $unitPrice = round($unitPrice, 2);
                     $lineSubtotal = round($quantity * $unitPrice, 2);
                     $lineTax = round($lineSubtotal * (((float) $product->taxCategory->rate) / 100), 2);
 
                     $subtotal += $lineSubtotal;
                     $taxTotal += $lineTax;
+                    $lineItems[] = [
+                        'product' => $product,
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'subtotal' => $lineSubtotal,
+                    ];
                 }
 
                 $subtotal = round($subtotal, 2);
                 $taxTotal = round($taxTotal, 2);
                 $discountTotal = 0.0;
                 $grandTotal = round($subtotal + $taxTotal - $discountTotal, 2);
+
+                // The backend owns the final sale amount. For the common single-tender flow we
+                // rewrite the payment amount to the server-calculated grand total so automatic
+                // markdowns and margin clamps do not leave the cashier stranded on a mismatch.
+                $normalizedPayments = $validated['payments'];
+
+                if (count($normalizedPayments) === 1) {
+                    $normalizedPayments[0]['amount'] = $grandTotal;
+                }
+
                 $paymentsTotal = round(
-                    collect($validated['payments'])->sum(fn (array $payment): float => round((float) $payment['amount'], 2)),
+                    collect($normalizedPayments)->sum(fn (array $payment): float => round((float) $payment['amount'], 2)),
                     2
                 );
 
@@ -131,26 +189,20 @@ class POSApiController extends Controller
                     'receipt_number' => $this->generateReceiptNumber(),
                 ]);
 
-                foreach ($validated['cart'] as $cartItem) {
-                    /** @var Product $product */
-                    $product = $products->get($cartItem['product_id']);
-                    $quantity = round((float) $cartItem['quantity'], 2);
-                    $unitPrice = round((float) $product->base_price, 2);
-                    $lineSubtotal = round($quantity * $unitPrice, 2);
-
+                foreach ($lineItems as $lineItem) {
                     SaleItem::query()->create([
                         'sale_id' => $sale->id,
-                        'product_id' => $product->id,
-                        'item_name' => $product->name,
-                        'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'subtotal' => $lineSubtotal,
+                        'product_id' => $lineItem['product']->id,
+                        'item_name' => $lineItem['product']->name,
+                        'quantity' => $lineItem['quantity'],
+                        'unit_price' => $lineItem['unit_price'],
+                        'subtotal' => $lineItem['subtotal'],
                     ]);
 
-                    $product->decrement('stock_quantity', $quantity);
+                    $lineItem['product']->decrement('stock_quantity', $lineItem['quantity']);
                 }
 
-                foreach ($validated['payments'] as $paymentData) {
+                foreach ($normalizedPayments as $paymentData) {
                     Payment::query()->create([
                         'sale_id' => $sale->id,
                         'method' => $paymentData['method'],
@@ -309,6 +361,48 @@ class POSApiController extends Controller
             'payment' => $payment,
             'sale' => $payment->sale,
         ]);
+    }
+
+    private function expiresWithin48Hours(CarbonInterface|string|null $batchExpiryDate): bool
+    {
+        if ($batchExpiryDate === null) {
+            return false;
+        }
+
+        $expiryDate = $batchExpiryDate instanceof CarbonInterface
+            ? $batchExpiryDate->copy()
+            : Carbon::parse($batchExpiryDate);
+
+        return $expiryDate->isFuture() && $expiryDate->lte(now()->addHours(48)->endOfDay());
+    }
+
+    private function daysSinceLastReceived(CarbonInterface|string|null $lastReceivedDate): int
+    {
+        if ($lastReceivedDate === null) {
+            return 0;
+        }
+
+        $receivedDate = $lastReceivedDate instanceof CarbonInterface
+            ? $lastReceivedDate->copy()
+            : Carbon::parse($lastReceivedDate);
+
+        return max(0, $receivedDate->startOfDay()->diffInDays(now()->startOfDay(), false));
+    }
+
+    private function hasValidManagerOverride(?string $pin): bool
+    {
+        if ($pin === null || $pin === '') {
+            return false;
+        }
+
+        /** @var User $user */
+        foreach (User::query()->whereNotNull('pin')->whereIn('role', ['manager', 'admin'])->cursor() as $user) {
+            if (Hash::check($pin, $user->pin)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function generateReceiptNumber(): string

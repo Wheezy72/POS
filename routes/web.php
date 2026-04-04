@@ -36,3 +36,9 @@ Route::middleware(['auth', 'role:admin,manager'])->prefix('api/admin')->group(fu
     Route::post('/cashiers', [AdminApiController::class, 'storeCashier']);
     Route::get('/reports/daily-summary', [AdminApiController::class, 'dailySummary']);
 });
+
+Route::middleware(['auth', 'role:admin'])->prefix('api/admin/reports')->group(function (): void {
+    Route::get('/inventory-velocity', [AdminApiController::class, 'inventoryVelocity']);
+    Route::get('/margin-bleed', [AdminApiController::class, 'marginBleed']);
+    Route::get('/peak-hours', [AdminApiController::class, 'peakHours']);
+});

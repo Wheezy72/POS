@@ -19,6 +19,9 @@ class Product extends Model
             'allow_fractional_sales' => 'boolean',
             'price_tiers' => 'array',
             'is_composite' => 'boolean',
+            'cost_price' => 'decimal:2',
+            'last_received_date' => 'date',
+            'batch_expiry_date' => 'date',
         ];
     }
 

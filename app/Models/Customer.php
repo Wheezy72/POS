@@ -12,6 +12,14 @@ class Customer extends Model
 
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return [
+            'phone' => 'encrypted',
+            'credit_limit' => 'encrypted',
+        ];
+    }
+
     public function sales(): HasMany
     {
         return $this->hasMany(Sale::class);
