@@ -33,7 +33,7 @@ class SystemSetting extends Model
             'enable_hardware_printer' => false,
             'enable_fractional_stock' => false,
             'enable_wholesale' => false,
-            'enable_mututho_lock' => false,
+            'enable_sales_hours_lock' => false,
             'is_app_configured' => false,
         ];
 

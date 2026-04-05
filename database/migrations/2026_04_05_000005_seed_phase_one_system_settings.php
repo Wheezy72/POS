@@ -14,7 +14,7 @@ return new class extends Migration
             'enable_hardware_printer' => 'false',
             'enable_fractional_stock' => 'false',
             'enable_wholesale' => 'false',
-            'enable_mututho_lock' => 'false',
+            'enable_sales_hours_lock' => 'false',
             'is_app_configured' => 'false',
         ] as $key => $value) {
             SystemSetting::query()->updateOrCreate(
@@ -30,7 +30,7 @@ return new class extends Migration
             ->whereIn('key', [
                 'enable_fractional_stock',
                 'enable_wholesale',
-                'enable_mututho_lock',
+                'enable_sales_hours_lock',
                 'is_app_configured',
             ])
             ->delete();
