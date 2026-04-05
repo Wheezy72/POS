@@ -19,6 +19,7 @@ class Sale extends Model
         return [
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
+            'is_suspected_duplicate' => 'boolean',
         ];
     }
 
