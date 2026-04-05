@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-C4ZncoW1.css",
+    "file": "assets/app-Ci1aQIxe.css",
     "name": "app",
     "names": [
       "app.css"
@@ -9,7 +9,7 @@
     "isEntry": true
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-Bme3R_Kr.css",
+    "file": "assets/theme-ioDEeVxf.css",
     "name": "theme",
     "names": [
       "theme.css"
@@ -18,7 +18,7 @@
     "isEntry": true
   },
   "resources/js/Pages/PosTerminal.vue": {
-    "file": "assets/PosTerminal-B82x_III.js",
+    "file": "assets/PosTerminal-C-_4lB58.js",
     "name": "PosTerminal",
     "src": "resources/js/Pages/PosTerminal.vue",
     "isDynamicEntry": true,
@@ -27,7 +27,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DRaRiNro.js",
+    "file": "assets/app-CD7oXRju.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -35,7 +35,7 @@
       "resources/js/Pages/PosTerminal.vue"
     ],
     "css": [
-      "assets/app-C4ZncoW1.css"
+      "assets/app-Ci1aQIxe.css"
     ]
   }
 }
