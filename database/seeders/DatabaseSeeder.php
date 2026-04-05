@@ -43,6 +43,10 @@ class DatabaseSeeder extends Seeder
             'enable_etims' => false,
             'enable_loyalty_points' => true,
             'enable_hardware_printer' => false,
+            'enable_fractional_stock' => false,
+            'enable_wholesale' => false,
+            'enable_mututho_lock' => false,
+            'is_app_configured' => false,
         ] as $key => $value) {
             SystemSetting::query()->updateOrCreate(
                 ['key' => $key],

@@ -6,14 +6,17 @@ use App\Http\Controllers\AdminApiController;
 use App\Http\Controllers\PaymentApiController;
 use App\Http\Controllers\POSApiController;
 use App\Http\Controllers\SecurityApiController;
+use App\Http\Controllers\SetupController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::view('/', 'welcome');
+Route::get('/setup', [SetupController::class, 'index'])->name('setup.index');
+Route::post('/setup', [SetupController::class, 'store'])->name('setup.store');
 Route::get('/pos', fn () => Inertia::render('PosTerminal', [
     'overlayHeading' => 'Unlock the register',
     'overlayLabel' => 'Staff PIN',
-]));
+]))->middleware('app.configured');
 Route::view('/dashboard', 'admin.dashboard');
 
 Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {

@@ -31,6 +31,10 @@ class SystemSetting extends Model
             'enable_etims' => false,
             'enable_loyalty_points' => true,
             'enable_hardware_printer' => false,
+            'enable_fractional_stock' => false,
+            'enable_wholesale' => false,
+            'enable_mututho_lock' => false,
+            'is_app_configured' => false,
         ];
 
         $settings = static::query()
