@@ -1,7 +1,28 @@
-@import 'tailwindcss';
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
 
 @source '../../../../app/Filament/**/*.php';
 @source '../../../../resources/views/filament/**/*.blade.php';
+
+.fi-simple-layout,
+.fi-body {
+    background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
+
+.fi-simple-main,
+.fi-section,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-modal-window {
+    border-radius: 1rem;
+}
+
+.fi-input,
+.fi-select-input,
+.fi-textarea,
+.fi-btn,
+.fi-dropdown-trigger {
+    border-radius: 0.75rem;
+}
 
 .fi-section-content,
 .fi-ta-ctn,

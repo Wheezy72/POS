@@ -37,12 +37,26 @@ class SetupWizardTest extends TestCase
             'business_type' => 'liquor',
         ]);
 
-        $response->assertRedirect('/admin');
+        $response->assertRedirect('/setup');
 
         $this->assertSame(true, SystemSetting::boolean('is_app_configured', false));
         $this->assertSame(true, SystemSetting::boolean('enable_fractional_stock', false));
         $this->assertSame(false, SystemSetting::boolean('enable_credit_sales', true));
         $this->assertSame(true, SystemSetting::boolean('enable_wholesale', false));
-        $this->assertSame(true, SystemSetting::boolean('enable_mututho_lock', false));
+        $this->assertSame(true, SystemSetting::boolean('enable_sales_hours_lock', false));
+    }
+
+    public function test_setup_completion_screen_is_shown_after_profile_selection(): void
+    {
+        $this->post('/setup', [
+            'business_type' => 'hardware',
+        ]);
+
+        $response = $this->get('/setup');
+
+        $response->assertOk();
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('SetupWizard')
+            ->where('justConfigured', true));
     }
 }

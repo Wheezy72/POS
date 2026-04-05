@@ -12,45 +12,48 @@ use Inertia\Response;
 
 class SetupController extends Controller
 {
-    public function index(): Response|RedirectResponse
+    public function index(Request $request): Response|RedirectResponse
     {
-        if (SystemSetting::boolean('is_app_configured', false)) {
-            return redirect('/admin');
+        $justConfigured = (bool) $request->session()->get('setup_complete', false);
+
+        if (SystemSetting::boolean('is_app_configured', false) && ! $justConfigured) {
+            return redirect('/pos');
         }
 
         return Inertia::render('SetupWizard', [
+            'justConfigured' => $justConfigured,
             'profiles' => [
                 [
                     'id' => 'hardware',
-                    'name' => 'Hardware',
-                    'description' => 'Supports fractional stock, wholesale pricing, and trade accounts.',
+                    'name' => 'Hardware store',
+                    'description' => 'Best for stores that sell measured items, bulk items, and account sales.',
                     'toggles' => [
                         'enable_fractional_stock' => true,
                         'enable_credit_sales' => true,
                         'enable_wholesale' => true,
-                        'enable_mututho_lock' => false,
+                        'enable_sales_hours_lock' => false,
                     ],
                 ],
                 [
                     'id' => 'liquor',
-                    'name' => 'Liquor',
-                    'description' => 'Supports tots and wholesale sales while enforcing Mututho controls.',
+                    'name' => 'Liquor store',
+                    'description' => 'Best for bottle stores that need sales-hour controls and no credit sales.',
                     'toggles' => [
                         'enable_fractional_stock' => true,
                         'enable_credit_sales' => false,
                         'enable_wholesale' => true,
-                        'enable_mututho_lock' => true,
+                        'enable_sales_hours_lock' => true,
                     ],
                 ],
                 [
                     'id' => 'minimart',
-                    'name' => 'Minimart',
-                    'description' => 'Uses standard packaged stock with no credit and no Mututho lock.',
+                    'name' => 'Mini market',
+                    'description' => 'Best for everyday packaged goods with simple pricing and no credit sales.',
                     'toggles' => [
                         'enable_fractional_stock' => false,
                         'enable_credit_sales' => false,
                         'enable_wholesale' => false,
-                        'enable_mututho_lock' => false,
+                        'enable_sales_hours_lock' => false,
                     ],
                 ],
             ],
@@ -68,19 +71,19 @@ class SetupController extends Controller
                 'enable_fractional_stock' => true,
                 'enable_credit_sales' => true,
                 'enable_wholesale' => true,
-                'enable_mututho_lock' => false,
+                'enable_sales_hours_lock' => false,
             ],
             'liquor' => [
                 'enable_fractional_stock' => true,
                 'enable_credit_sales' => false,
                 'enable_wholesale' => true,
-                'enable_mututho_lock' => true,
+                'enable_sales_hours_lock' => true,
             ],
             'minimart' => [
                 'enable_fractional_stock' => false,
                 'enable_credit_sales' => false,
                 'enable_wholesale' => false,
-                'enable_mututho_lock' => false,
+                'enable_sales_hours_lock' => false,
             ],
         ];
 
@@ -96,6 +99,6 @@ class SetupController extends Controller
             ['value' => 'true'],
         );
 
-        return redirect('/admin');
+        return redirect('/setup')->with('setup_complete', true);
     }
 }
