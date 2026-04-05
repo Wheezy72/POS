@@ -28,12 +28,10 @@ Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (
 });
 
 Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
-Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin'])
-    ->middleware('throttle:pin-login');
+Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin']);
 
 Route::prefix('api/auth')->group(function (): void {
-    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
-        ->middleware('throttle:pin-login');
+    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin']);
 });
 
 Route::middleware('auth')->group(function (): void {

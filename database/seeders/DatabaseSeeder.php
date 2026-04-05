@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SystemSetting;
 use App\Models\TaxCategory;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -22,6 +23,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         DB::transaction(function (): void {
+            $this->seedSystemSettings();
             $taxCategories = $this->seedTaxCategories();
             $categories = $this->seedCategories();
             $users = $this->seedUsers();
@@ -32,6 +34,21 @@ class DatabaseSeeder extends Seeder
             $this->seedHistoricalSales($products, $customers, $users['cashiers']);
             $this->seedIncomingMpesaFeed();
         });
+    }
+
+    private function seedSystemSettings(): void
+    {
+        foreach ([
+            'enable_credit_sales' => true,
+            'enable_etims' => false,
+            'enable_loyalty_points' => true,
+            'enable_hardware_printer' => false,
+        ] as $key => $value) {
+            SystemSetting::query()->updateOrCreate(
+                ['key' => $key],
+                ['value' => $value ? 'true' : 'false'],
+            );
+        }
     }
 
     private function seedTaxCategories(): array
@@ -279,12 +296,15 @@ class DatabaseSeeder extends Seeder
         ];
 
         return collect($names)->map(function (string $name) {
+            $phone = '2547' . random_int(10000000, 99999999);
+
             return Customer::query()->create([
                 'name' => $name,
-                'phone' => null,
+                'phone' => $phone,
+                'phone_normalized' => Customer::normalizePhone($phone),
                 'trust_score' => 100,
                 'loyalty_points_balance' => random_int(10, 800),
-                'credit_limit' => random_int(0, 5000),
+                'credit_limit' => random_int(1000, 8000),
             ]);
         });
     }

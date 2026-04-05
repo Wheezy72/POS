@@ -6,13 +6,15 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\Payment;
-use App\Models\ShiftLedger;
+use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
@@ -84,7 +86,7 @@ class SecurityApiController extends Controller
     public function openShift(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'opening_cash' => ['required', 'numeric', 'min:0'],
+            'opening_cash' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         /** @var User|null $user */
@@ -97,10 +99,10 @@ class SecurityApiController extends Controller
         }
 
         try {
-            $shiftLedger = DB::transaction(function () use ($user, $validated): ShiftLedger {
-                $existingOpenShift = ShiftLedger::query()
-                    ->where('user_id', $user->id)
-                    ->where('status', 'open')
+            $shift = DB::transaction(function () use ($user, $validated): Shift {
+                $existingOpenShift = Shift::query()
+                    ->where('cashier_id', $user->id)
+                    ->whereNull('end_time')
                     ->lockForUpdate()
                     ->first();
 
@@ -108,24 +110,23 @@ class SecurityApiController extends Controller
                     throw new RuntimeException('An open shift already exists for this user.');
                 }
 
-                $shiftLedger = ShiftLedger::query()->create([
-                    'user_id' => $user->id,
-                    'opening_time' => now(),
-                    'closing_time' => null,
-                    'opening_cash' => round((float) $validated['opening_cash'], 2),
-                    'declared_closing_cash' => null,
-                    'expected_closing_cash' => null,
-                    'status' => 'open',
+                $shift = Shift::query()->create([
+                    'cashier_id' => $user->id,
+                    'start_time' => now(),
+                    'end_time' => null,
+                    'expected_cash' => round((float) ($validated['opening_cash'] ?? 0), 2),
+                    'counted_cash' => null,
+                    'variance' => null,
                 ]);
 
                 AuditLog::query()->create([
                     'user_id' => $user->id,
                     'action' => 'open_shift',
-                    'description' => "Shift opened with opening cash {$shiftLedger->opening_cash}.",
-                    'reference_id' => $shiftLedger->id,
+                    'description' => "Shift opened with opening cash {$shift->expected_cash}.",
+                    'reference_id' => $shift->id,
                 ]);
 
-                return $shiftLedger;
+                return $shift;
             });
         } catch (RuntimeException $exception) {
             return response()->json([
@@ -141,14 +142,14 @@ class SecurityApiController extends Controller
 
         return response()->json([
             'message' => 'Shift opened successfully.',
-            'shift' => $shiftLedger,
+            'shift' => $shift,
         ], 201);
     }
 
     public function closeShift(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'declared_cash' => ['required', 'numeric', 'min:0'],
+            'counted_cash' => ['required', 'numeric', 'min:0'],
         ]);
 
         /** @var User|null $user */
@@ -161,53 +162,50 @@ class SecurityApiController extends Controller
         }
 
         try {
-            [$shiftLedger, $discrepancy] = DB::transaction(function () use ($user, $validated): array {
-                /** @var ShiftLedger|null $shiftLedger */
-                $shiftLedger = ShiftLedger::query()
-                    ->where('user_id', $user->id)
-                    ->where('status', 'open')
+            $shift = DB::transaction(function () use ($user, $validated): Shift {
+                /** @var Shift|null $shift */
+                $shift = Shift::query()
+                    ->where('cashier_id', $user->id)
+                    ->whereNull('end_time')
                     ->lockForUpdate()
                     ->first();
 
-                if ($shiftLedger === null) {
+                if ($shift === null) {
                     throw new RuntimeException('No open shift found for this user.');
                 }
 
-                $closingTime = now();
+                $endTime = now();
 
-                // Blind Z-read protection:
-                // expected cash is computed server-side from recorded cash payments only,
-                // so the cashier cannot influence it from the client payload.
                 $cashTakings = round((float) Payment::query()
                     ->where('method', 'cash')
                     ->where('status', 'completed')
-                    ->whereHas('sale', function ($builder) use ($user, $shiftLedger, $closingTime) {
+                    ->whereHas('sale', function ($builder) use ($user, $shift, $endTime) {
                         $builder
                             ->where('user_id', $user->id)
                             ->where('status', 'completed')
-                            ->whereBetween('created_at', [$shiftLedger->opening_time, $closingTime]);
+                            ->whereBetween('created_at', [$shift->start_time, $endTime]);
                     })
                     ->sum('amount'), 2);
 
-                $expectedCash = round(((float) $shiftLedger->opening_cash) + $cashTakings, 2);
-                $declaredCash = round((float) $validated['declared_cash'], 2);
-                $discrepancy = round($declaredCash - $expectedCash, 2);
+                $expectedCash = round(((float) $shift->expected_cash) + $cashTakings, 2);
+                $countedCash = round((float) $validated['counted_cash'], 2);
+                $variance = round($countedCash - $expectedCash, 2);
 
-                $shiftLedger->update([
-                    'closing_time' => $closingTime,
-                    'declared_closing_cash' => $declaredCash,
-                    'expected_closing_cash' => $expectedCash,
-                    'status' => 'closed',
+                $shift->update([
+                    'end_time' => $endTime,
+                    'expected_cash' => $expectedCash,
+                    'counted_cash' => $countedCash,
+                    'variance' => $variance,
                 ]);
 
                 AuditLog::query()->create([
                     'user_id' => $user->id,
                     'action' => 'close_shift',
-                    'description' => "Shift closed. Expected cash: {$expectedCash}. Declared cash: {$declaredCash}. Discrepancy: {$discrepancy}.",
-                    'reference_id' => $shiftLedger->id,
+                    'description' => "Shift closed. Expected cash: {$expectedCash}. Counted cash: {$countedCash}. Variance: {$variance}.",
+                    'reference_id' => $shift->id,
                 ]);
 
-                return [$shiftLedger->fresh(), $discrepancy];
+                return $shift->fresh();
             });
         } catch (RuntimeException $exception) {
             return response()->json([
@@ -223,8 +221,12 @@ class SecurityApiController extends Controller
 
         return response()->json([
             'message' => 'Shift closed successfully.',
-            'shift' => $shiftLedger,
-            'discrepancy' => $discrepancy,
+            'shift' => [
+                'id' => $shift->id,
+                'cashier_id' => $shift->cashier_id,
+                'start_time' => $shift->start_time,
+                'end_time' => $shift->end_time,
+            ],
         ]);
     }
 
@@ -266,12 +268,23 @@ class SecurityApiController extends Controller
             'pin' => ['required', 'string', 'regex:/^\d{4}(\d{2})?$/'],
         ]);
 
+        $throttleKey = $this->pinThrottleKey($request, $roles);
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 3)) {
+            return response()->json([
+                'message' => 'Too many PIN login attempts. Terminal locked for 60 seconds.',
+                'retry_after' => RateLimiter::availableIn($throttleKey),
+            ], 429);
+        }
+
         // PINs are stored as one-way hashes, so they cannot be queried directly.
         // In a POS environment the active user list is typically small enough that
         // verifying against the staff roster is acceptable and keeps the PIN secret at rest.
         $user = $this->findUserByPin($validated['pin']);
 
         if ($user === null) {
+            RateLimiter::hit($throttleKey, 60);
+
             return response()->json([
                 'message' => 'Invalid credentials.',
             ], 422);
@@ -282,6 +295,8 @@ class SecurityApiController extends Controller
                 'message' => $forbiddenMessage ?? 'This account cannot access this workflow.',
             ], 403);
         }
+
+        RateLimiter::clear($throttleKey);
 
         // The routes are registered in web.php, so session authentication is a valid
         // offline-friendly option even when the API is consumed by a local device.
@@ -305,6 +320,25 @@ class SecurityApiController extends Controller
                 'name' => $user->name,
                 'role' => $user->role,
             ],
+        ]);
+    }
+
+    private function pinThrottleKey(Request $request, array $roles): string
+    {
+        $terminalId = $request->session()->get('terminal_lock_id');
+
+        if ($terminalId === null) {
+            $terminalId = (string) Str::uuid();
+            $request->session()->put('terminal_lock_id', $terminalId);
+        }
+
+        $scope = $roles === [] ? 'any' : implode('-', $roles);
+
+        return implode(':', [
+            'pin-login',
+            $scope,
+            (string) $request->ip(),
+            $terminalId,
         ]);
     }
 }

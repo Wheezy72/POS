@@ -41,6 +41,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(ShiftLedger::class);
     }
 
+    public function shifts(): HasMany
+    {
+        return $this->hasMany(Shift::class, 'cashier_id');
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);

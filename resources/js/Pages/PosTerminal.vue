@@ -316,6 +316,7 @@
                             <button class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'cash' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'cash'">Cash</button>
                             <button class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'stk' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'stk'">M-PESA STK</button>
                             <button class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'live' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'live'">C2B Live Feed</button>
+                            <button v-if="creditSalesEnabled" class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'credit' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'credit'">[F7] Pay Later</button>
                         </div>
 
                         <div v-if="paymentTab === 'cash'" class="mt-4 grid gap-3 border border-slate-700 p-4">
@@ -343,7 +344,7 @@
                             </button>
                         </div>
 
-                        <div v-else class="mt-4 grid gap-3 border border-slate-700 p-4">
+                        <div v-else-if="paymentTab === 'live'" class="mt-4 grid gap-3 border border-slate-700 p-4">
                             <p class="text-sm text-slate-500">Select an inbound payment from the live feed. The backend claims it against this sale.</p>
                             <div class="max-h-64 overflow-auto border border-slate-700">
                                 <button
@@ -364,6 +365,15 @@
                             </div>
                             <button class="border border-emerald-500 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || !selectedLivePayment || cart.length === 0" @click="submitLiveFeedCheckout()">
                                 Claim inbound payment and checkout
+                            </button>
+                        </div>
+
+                        <div v-else class="mt-4 grid gap-3 border border-slate-700 p-4">
+                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Customer phone</label>
+                            <input v-model.trim="customerPhone" type="text" class="h-12 border border-slate-600 bg-slate-950 px-3 text-lg font-bold outline-none" placeholder="2547XXXXXXXX">
+                            <p class="text-sm text-slate-500">The customer must already exist and remain within the configured credit limit.</p>
+                            <button class="border border-yellow-500 bg-yellow-300 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-slate-950 hover:bg-yellow-200 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0 || !customerPhone" @click="submitCreditCheckout()">
+                                Save as credit sale
                             </button>
                         </div>
                     </section>
@@ -442,6 +452,7 @@ const props = defineProps({
 });
 
 const page = usePage();
+const settings = computed(() => page.props.settings ?? {});
 
 const scannerInput = ref(null);
 const pinInput = ref(null);
@@ -463,6 +474,7 @@ const showPinOverlay = ref(!currentUser.value);
 const paymentTab = ref('cash');
 const pin = ref('');
 const managerPin = ref('');
+const customerPhone = ref('');
 const cashReceived = ref(0);
 const stkPhone = ref('2547');
 const stkCheckoutRequestId = ref('');
@@ -478,11 +490,13 @@ let clockTimer = null;
 let focusTimer = null;
 let liveFeedTimer = null;
 let stkPollTimer = null;
+let audioContext = null;
 
 const subtotal = computed(() => cart.value.reduce((sum, item) => sum + lineSubtotal(item), 0));
 const tax = computed(() => cart.value.reduce((sum, item) => sum + lineTax(item), 0));
 const grandTotal = computed(() => roundCurrency(subtotal.value + tax.value));
 const totalUnits = computed(() => cart.value.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+const creditSalesEnabled = computed(() => Boolean(settings.value.enable_credit_sales));
 const cashChange = computed(() => roundCurrency(Number(cashReceived.value || 0) - grandTotal.value));
 const cashPresets = computed(() => {
     const total = grandTotal.value;
@@ -568,6 +582,15 @@ function handleGlobalKeydown(event) {
         case 'F4':
             event.preventDefault();
             openPayModal();
+            break;
+        case 'F7':
+            if (!creditSalesEnabled.value) {
+                break;
+            }
+
+            event.preventDefault();
+            openPayModal();
+            paymentTab.value = 'credit';
             break;
         case 'F8':
             event.preventDefault();
@@ -769,6 +792,7 @@ function addProductToCart(product) {
     }
 
     toast('Item added', `${product.name} added to the cart.`, 'success');
+    playSuccessBeep();
     barcode.value = '';
     focusScannerInput(true);
 }
@@ -923,11 +947,36 @@ async function submitLiveFeedCheckout() {
     });
 }
 
+async function submitCreditCheckout() {
+    if (!creditSalesEnabled.value) {
+        toast('Credit disabled', 'Credit sales are disabled for this shop.', 'error');
+        return;
+    }
+
+    if (!customerPhone.value) {
+        toast('Customer required', 'Enter the customer phone number before saving a credit sale.', 'error');
+        return;
+    }
+
+    await finalizeCheckout({
+        customer_phone: customerPhone.value,
+        payments: [
+            {
+                method: 'credit_deni',
+                amount: grandTotal.value,
+                reference_number: customerPhone.value,
+                status: 'pending',
+            },
+        ],
+    });
+}
+
 async function finalizeCheckout(payload, resetAfterSuccess = true) {
     checkoutBusy.value = true;
 
     try {
         const response = await window.axios.post('/api/pos/checkout', {
+            customer_phone: customerPhone.value || null,
             manager_pin: managerPin.value || null,
             cart: cart.value.map((item) => ({
                 product_id: item.product_id,
@@ -1032,6 +1081,7 @@ function newSale(showMessage = true) {
     searchQuery.value = '';
     cashReceived.value = 0;
     managerPin.value = '';
+    customerPhone.value = '';
     selectedLivePayment.value = null;
     stkCheckoutRequestId.value = '';
     stkStatusMessage.value = 'Idle';
@@ -1063,6 +1113,10 @@ function updateCsrfToken(token) {
 function toast(title, message, variant = 'info') {
     const id = `${Date.now()}-${Math.random()}`;
     toasts.value.push({ id, title, message, variant });
+
+    if (variant === 'error') {
+        playErrorBuzz();
+    }
 
     window.setTimeout(() => {
         toasts.value = toasts.value.filter((toastItem) => toastItem.id !== id);
@@ -1108,5 +1162,44 @@ function shortTimestamp(value) {
         day: '2-digit',
         month: 'short',
     }).format(new Date(value));
+}
+
+function playSuccessBeep() {
+    playTone(1240, 0.08, 'triangle', 0.045);
+}
+
+function playErrorBuzz() {
+    playTone(180, 0.18, 'sawtooth', 0.06);
+}
+
+function playTone(frequency, durationSeconds, type, volume) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+
+    if (!AudioContextClass) {
+        return;
+    }
+
+    if (!audioContext) {
+        audioContext = new AudioContextClass();
+    }
+
+    if (audioContext.state === 'suspended') {
+        audioContext.resume().catch(() => {});
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const startAt = audioContext.currentTime;
+    const stopAt = startAt + durationSeconds;
+
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, startAt);
+    gainNode.gain.setValueAtTime(volume, startAt);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.start(startAt);
+    oscillator.stop(stopAt);
 }
 </script>

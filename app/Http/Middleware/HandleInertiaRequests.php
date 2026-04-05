@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -32,6 +33,7 @@ class HandleInertiaRequests extends Middleware
                 'blockedRole' => $user !== null && ! $isCashier ? $user->role : null,
             ],
             'csrfToken' => csrf_token(),
+            'settings' => SystemSetting::featureFlags(),
         ];
     }
 }
