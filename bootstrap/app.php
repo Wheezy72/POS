@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\EnsureAppIsConfigured;
 use App\Http\Middleware\EnsureUserHasRole;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,7 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/webhooks/mpesa/c2b',
         ]);
 
+        $middleware->web(append: [
+            HandleInertiaRequests::class,
+        ]);
+
         $middleware->alias([
+            'app.configured' => EnsureAppIsConfigured::class,
             'role' => EnsureUserHasRole::class,
         ]);
     })

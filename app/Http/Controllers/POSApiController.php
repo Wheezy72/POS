@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Jobs\PrintReceiptToHardware;
 use App\Jobs\SyncSaleToCloud;
+use App\Models\Customer;
+use App\Models\CustomerLedger;
 use App\Models\IncomingMpesaPayment;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Models\SystemSetting;
 use App\Models\User;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -49,11 +53,13 @@ class POSApiController extends Controller
     {
         $validated = $request->validate([
             'customer_id' => ['nullable', 'uuid'],
+            'customer_phone' => ['nullable', 'string', 'max:32'],
             'manager_pin' => ['nullable', 'string', 'regex:/^\d{4}(\d{2})?$/'],
             'claim_transaction_code' => ['nullable', 'string', 'max:255'],
             'cart' => ['required', 'array', 'min:1'],
             'cart.*.product_id' => ['required', 'uuid'],
             'cart.*.quantity' => ['required', 'numeric', 'gt:0'],
+            'cart.*.override_unit_price' => ['nullable', 'numeric', 'gt:0'],
             'payments' => ['required', 'array', 'min:1'],
             'payments.*.method' => ['required', 'in:cash,mpesa,card,credit_deni'],
             'payments.*.amount' => ['required', 'numeric', 'gt:0'],
@@ -73,6 +79,10 @@ class POSApiController extends Controller
 
         try {
             $sale = DB::transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
+                $creditSaleRequested = collect($validated['payments'])->contains(
+                    fn (array $payment): bool => $payment['method'] === 'credit_deni'
+                );
+                $customer = $this->resolveSaleCustomer($validated, $creditSaleRequested);
                 $claimedIncomingPayment = null;
 
                 if (! empty($validated['claim_transaction_code'])) {
@@ -126,16 +136,18 @@ class POSApiController extends Controller
 
                     $basePrice = round((float) $product->base_price, 2);
                     $costPrice = round((float) $product->cost_price, 2);
-                    $originalUnitPrice = $basePrice;
+                    $overrideUnitPrice = array_key_exists('override_unit_price', $cartItem) && $cartItem['override_unit_price'] !== null
+                        ? round((float) $cartItem['override_unit_price'], 2)
+                        : null;
                     $priceSource = 'base_price';
 
                     // Rule 1: expiry-driven markdowns.
                     // If the batch expires within 48 hours, the engine automatically cuts the shelf
                     // price by 50% to improve sell-through before the stock becomes waste.
-                    $unitPrice = $basePrice;
+                    $engineUnitPrice = $basePrice;
 
                     if ($this->expiresWithin48Hours($product->batch_expiry_date)) {
-                        $unitPrice = round($basePrice * 0.5, 2);
+                        $engineUnitPrice = round($basePrice * 0.5, 2);
                         $priceSource = 'expiry_markdown';
                     }
 
@@ -159,6 +171,17 @@ class POSApiController extends Controller
                     // up to the minimum safe value unless a valid manager PIN override was supplied.
                     $marginClampApplied = false;
 
+                    if ($overrideUnitPrice !== null) {
+                        if (! $managerOverrideApproved && $overrideUnitPrice < $marginFloor) {
+                            throw new RuntimeException("Manual price override for {$product->name} is below the margin floor of {$marginFloor}. Manager PIN required.");
+                        }
+
+                        $unitPrice = $overrideUnitPrice;
+                        $priceSource = 'manual_override';
+                    } else {
+                        $unitPrice = $engineUnitPrice;
+                    }
+
                     if (! $managerOverrideApproved && $unitPrice < $marginFloor) {
                         $unitPrice = $marginFloor;
                         $marginClampApplied = true;
@@ -169,7 +192,7 @@ class POSApiController extends Controller
                     $lineSubtotal = round($quantity * $unitPrice, 2);
                     $lineTax = round($lineSubtotal * (((float) $product->taxCategory->rate) / 100), 2);
 
-                    if ($unitPrice !== $originalUnitPrice || $marginClampApplied) {
+                    if ($unitPrice !== $basePrice || $marginClampApplied || $overrideUnitPrice !== null) {
                         $pricingAdjustments[] = [
                             'product_id' => $product->id,
                             'product_name' => $product->name,
@@ -177,6 +200,7 @@ class POSApiController extends Controller
                             'base_unit_price' => $basePrice,
                             'final_unit_price' => $unitPrice,
                             'margin_floor' => $marginFloor,
+                            'override_unit_price' => $overrideUnitPrice,
                             'price_source' => $priceSource,
                             'manager_override_used' => $managerOverrideApproved,
                         ];
@@ -221,9 +245,13 @@ class POSApiController extends Controller
                     throw new RuntimeException('A claimed M-PESA transaction must be attached to an M-PESA payment line.');
                 }
 
+                if ($creditSaleRequested && ! SystemSetting::boolean('enable_credit_sales', true)) {
+                    throw new RuntimeException('Credit sales are disabled for this shop.');
+                }
+
                 $sale = Sale::query()->create([
                     'user_id' => $cashierId,
-                    'customer_id' => $validated['customer_id'] ?? null,
+                    'customer_id' => $customer?->id ?? ($validated['customer_id'] ?? null),
                     'subtotal' => $subtotal,
                     'tax_total' => $taxTotal,
                     'discount_total' => $discountTotal,
@@ -246,6 +274,7 @@ class POSApiController extends Controller
                 }
 
                 $mpesaClaimAttached = false;
+                $creditPayment = null;
 
                 foreach ($normalizedPayments as $paymentData) {
                     $referenceNumber = $paymentData['reference_number'] ?? null;
@@ -259,13 +288,19 @@ class POSApiController extends Controller
                         $mpesaClaimAttached = true;
                     }
 
-                    Payment::query()->create([
+                    $payment = Payment::query()->create([
                         'sale_id' => $sale->id,
                         'method' => $paymentData['method'],
                         'amount' => round((float) $paymentData['amount'], 2),
                         'reference_number' => $referenceNumber,
-                        'status' => $paymentData['status'] ?? 'completed',
+                        'status' => $paymentData['method'] === 'credit_deni'
+                            ? 'pending'
+                            : ($paymentData['status'] ?? 'completed'),
                     ]);
+
+                    if ($payment->method === 'credit_deni') {
+                        $creditPayment = $payment;
+                    }
                 }
 
                 if ($claimedIncomingPayment !== null) {
@@ -275,7 +310,36 @@ class POSApiController extends Controller
                     ]);
                 }
 
+                if ($creditPayment !== null) {
+                    if ($customer === null) {
+                        throw new RuntimeException('Credit sales require a registered customer.');
+                    }
+
+                    $outstandingBalance = $customer->outstandingBalance();
+                    $nextOutstandingBalance = round($outstandingBalance + $grandTotal, 2);
+                    $creditLimit = round((float) $customer->credit_limit, 2);
+
+                    if ($nextOutstandingBalance > $creditLimit) {
+                        throw new RuntimeException("Credit limit exceeded for {$customer->name}. Outstanding balance would rise to {$nextOutstandingBalance} against a limit of {$creditLimit}.");
+                    }
+
+                    CustomerLedger::query()->create([
+                        'customer_id' => $customer->id,
+                        'sale_id' => $sale->id,
+                        'payment_id' => $creditPayment->id,
+                        'created_by' => $cashierId,
+                        'entry_type' => 'debt',
+                        'amount' => $grandTotal,
+                        'balance_after' => $nextOutstandingBalance,
+                        'notes' => "Credit sale logged at checkout for receipt {$sale->receipt_number}.",
+                    ]);
+                }
+
                 SyncSaleToCloud::dispatch($sale)->afterCommit();
+
+                if (SystemSetting::boolean('enable_hardware_printer', false)) {
+                    PrintReceiptToHardware::dispatch($sale)->afterCommit();
+                }
 
                 return $sale->load([
                     'customer',
@@ -450,7 +514,7 @@ class POSApiController extends Controller
             ? $lastReceivedDate->copy()
             : Carbon::parse($lastReceivedDate);
 
-        return max(0, $receivedDate->startOfDay()->diffInDays(now()->startOfDay(), false));
+        return (int) max(0, $receivedDate->startOfDay()->diffInDays(now()->startOfDay(), false));
     }
 
     private function hasValidManagerOverride(?string $pin): bool
@@ -467,6 +531,33 @@ class POSApiController extends Controller
         }
 
         return false;
+    }
+
+    private function resolveSaleCustomer(array $validated, bool $creditSaleRequested): ?Customer
+    {
+        if (! empty($validated['customer_id'])) {
+            return Customer::query()->find($validated['customer_id']);
+        }
+
+        $normalizedPhone = Customer::normalizePhone($validated['customer_phone'] ?? null);
+
+        if ($normalizedPhone === null) {
+            if ($creditSaleRequested) {
+                throw new RuntimeException('Credit sales require a customer phone number.');
+            }
+
+            return null;
+        }
+
+        $customer = Customer::query()
+            ->where('phone_normalized', $normalizedPhone)
+            ->first();
+
+        if ($customer === null && $creditSaleRequested) {
+            throw new RuntimeException('No customer was found for the supplied phone number.');
+        }
+
+        return $customer;
     }
 
     private function generateReceiptNumber(): string

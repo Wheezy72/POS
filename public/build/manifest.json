@@ -1,0 +1,51 @@
+{
+  "resources/css/app.css": {
+    "file": "assets/app-DGrOKVw3.css",
+    "name": "app",
+    "names": [
+      "app.css"
+    ],
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/css/filament/admin/theme.css": {
+    "file": "assets/theme-D3U96ETT.css",
+    "name": "theme",
+    "names": [
+      "theme.css"
+    ],
+    "src": "resources/css/filament/admin/theme.css",
+    "isEntry": true
+  },
+  "resources/js/Pages/PosTerminal.vue": {
+    "file": "assets/PosTerminal-DtABK8he.js",
+    "name": "PosTerminal",
+    "src": "resources/js/Pages/PosTerminal.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/Pages/SetupWizard.vue": {
+    "file": "assets/SetupWizard-BR66GFdT.js",
+    "name": "SetupWizard",
+    "src": "resources/js/Pages/SetupWizard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-DLxIjVsf.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "resources/js/Pages/PosTerminal.vue",
+      "resources/js/Pages/SetupWizard.vue"
+    ],
+    "css": [
+      "assets/app-DGrOKVw3.css"
+    ]
+  }
+}

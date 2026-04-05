@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\SystemSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -10,8 +11,21 @@ class PosAuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_sees_the_login_overlay_on_the_pos_screen(): void
+    public function test_guest_is_redirected_to_setup_when_the_app_is_not_configured(): void
     {
+        $response = $this->get('/pos');
+
+        $response->assertRedirect('/setup');
+    }
+
+    public function test_guest_sees_the_login_overlay_on_the_pos_screen_after_setup(): void
+    {
+        SystemSetting::query()->updateOrCreate([
+            'key' => 'is_app_configured',
+        ], [
+            'value' => 'true',
+        ]);
+
         $response = $this->get('/pos');
 
         $response->assertOk();

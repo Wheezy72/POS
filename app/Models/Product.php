@@ -30,6 +30,11 @@ class Product extends Model
         return $this->belongsTo(TaxCategory::class);
     }
 
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
     public function saleItems(): HasMany
     {
         return $this->hasMany(SaleItem::class);

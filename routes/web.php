@@ -6,10 +6,17 @@ use App\Http\Controllers\AdminApiController;
 use App\Http\Controllers\PaymentApiController;
 use App\Http\Controllers\POSApiController;
 use App\Http\Controllers\SecurityApiController;
+use App\Http\Controllers\SetupController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::view('/', 'welcome');
-Route::view('/pos', 'pos-checkout');
+Route::get('/setup', [SetupController::class, 'index'])->name('setup.index');
+Route::post('/setup', [SetupController::class, 'store'])->name('setup.store');
+Route::get('/pos', fn () => Inertia::render('PosTerminal', [
+    'overlayHeading' => 'Unlock the register',
+    'overlayLabel' => 'Staff PIN',
+]))->middleware('app.configured');
 Route::view('/dashboard', 'admin.dashboard');
 
 Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {
@@ -24,17 +31,16 @@ Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (
 });
 
 Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
-Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin'])
-    ->middleware('throttle:pin-login');
+Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin']);
 
 Route::prefix('api/auth')->group(function (): void {
-    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
-        ->middleware('throttle:pin-login');
+    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin']);
 });
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/api/auth/manager-override', [SecurityApiController::class, 'managerOverride'])
         ->middleware('throttle:manager-override');
+    Route::post('/api/logout', [SecurityApiController::class, 'logout']);
     Route::post('/api/shifts/open', [SecurityApiController::class, 'openShift']);
     Route::post('/api/shifts/close', [SecurityApiController::class, 'closeShift']);
 });
