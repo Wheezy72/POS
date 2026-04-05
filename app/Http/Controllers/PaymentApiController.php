@@ -47,6 +47,7 @@ class PaymentApiController extends Controller
             [
                 'customer_name' => $customerName,
                 'phone_number' => $validated['MSISDN'] ?? '',
+                'phone_number_normalized' => \App\Models\Customer::normalizePhone($validated['MSISDN'] ?? null),
                 'amount' => round((float) $validated['TransAmount'], 2),
                 'status' => 'pending',
                 'claimed_at' => null,

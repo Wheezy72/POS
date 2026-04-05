@@ -15,6 +15,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'backup_disk' => env('DB_BACKUP_DISK', 's3'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

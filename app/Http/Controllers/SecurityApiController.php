@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
+use App\Models\CashDrawerTransaction;
 use App\Models\Payment;
 use App\Models\Shift;
 use App\Models\User;
@@ -187,7 +188,14 @@ class SecurityApiController extends Controller
                     })
                     ->sum('amount'), 2);
 
-                $expectedCash = round(((float) $shift->expected_cash) + $cashTakings, 2);
+                $drawerPayIns = round((float) $shift->cashDrawerTransactions()
+                    ->where('type', 'pay_in')
+                    ->sum('amount'), 2);
+                $drawerPayOuts = round((float) $shift->cashDrawerTransactions()
+                    ->where('type', 'pay_out')
+                    ->sum('amount'), 2);
+
+                $expectedCash = round(((float) $shift->expected_cash) + $cashTakings + $drawerPayIns - $drawerPayOuts, 2);
                 $countedCash = round((float) $validated['counted_cash'], 2);
                 $variance = round($countedCash - $expectedCash, 2);
 
@@ -201,7 +209,7 @@ class SecurityApiController extends Controller
                 AuditLog::query()->create([
                     'user_id' => $user->id,
                     'action' => 'close_shift',
-                    'description' => "Shift closed. Expected cash: {$expectedCash}. Counted cash: {$countedCash}. Variance: {$variance}.",
+                    'description' => "Shift closed. Expected cash: {$expectedCash}. Counted cash: {$countedCash}. Variance: {$variance}. Pay-ins: {$drawerPayIns}. Pay-outs: {$drawerPayOuts}.",
                     'reference_id' => $shift->id,
                 ]);
 
@@ -228,6 +236,71 @@ class SecurityApiController extends Controller
                 'end_time' => $shift->end_time,
             ],
         ]);
+    }
+
+    public function recordCashDrawerTransaction(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'in:pay_in,pay_out'],
+            'amount' => ['required', 'numeric', 'gt:0'],
+            'reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        /** @var User|null $user */
+        $user = $request->user();
+
+        if ($user === null) {
+            return response()->json([
+                'message' => 'Unauthenticated user.',
+            ], 401);
+        }
+
+        try {
+            $transaction = DB::transaction(function () use ($user, $validated): CashDrawerTransaction {
+                /** @var Shift|null $shift */
+                $shift = Shift::query()
+                    ->where('cashier_id', $user->id)
+                    ->whereNull('end_time')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($shift === null) {
+                    throw new RuntimeException('No open shift found for this user.');
+                }
+
+                $transaction = CashDrawerTransaction::query()->create([
+                    'shift_id' => $shift->id,
+                    'cashier_id' => $user->id,
+                    'type' => $validated['type'],
+                    'amount' => round((float) $validated['amount'], 2),
+                    'reason' => $validated['reason'],
+                ]);
+
+                AuditLog::query()->create([
+                    'user_id' => $user->id,
+                    'action' => $validated['type'],
+                    'description' => "Cash drawer {$validated['type']} recorded for {$transaction->amount}. Reason: {$validated['reason']}.",
+                    'reference_id' => $transaction->id,
+                ]);
+
+                return $transaction;
+            });
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'message' => $exception->getMessage(),
+            ], 422);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'Unable to record cash drawer transaction.',
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Cash drawer transaction recorded successfully.',
+            'transaction' => $transaction,
+        ], 201);
     }
 
     public function logout(Request $request): JsonResponse

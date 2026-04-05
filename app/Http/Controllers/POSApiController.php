@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\AuditLog;
 use App\Jobs\PrintReceiptToHardware;
 use App\Jobs\SyncSaleToCloud;
 use App\Models\Customer;
@@ -58,11 +59,12 @@ class POSApiController extends Controller
             'claim_transaction_code' => ['nullable', 'string', 'max:255'],
             'cart' => ['required', 'array', 'min:1'],
             'cart.*.product_id' => ['required', 'uuid'],
-            'cart.*.quantity' => ['required', 'numeric', 'gt:0'],
+            'cart.*.quantity' => ['required', 'numeric'],
             'cart.*.override_unit_price' => ['nullable', 'numeric', 'gt:0'],
             'payments' => ['required', 'array', 'min:1'],
             'payments.*.method' => ['required', 'in:cash,mpesa,card,credit_deni'],
-            'payments.*.amount' => ['required', 'numeric', 'gt:0'],
+            'payments.*.amount' => ['required', 'numeric'],
+            'payments.*.phone_number' => ['nullable', 'string', 'max:32'],
             'payments.*.reference_number' => ['nullable', 'string'],
             'payments.*.status' => ['nullable', 'in:pending,completed,failed'],
         ]);
@@ -75,7 +77,8 @@ class POSApiController extends Controller
             ], 401);
         }
 
-        $managerOverrideApproved = $this->hasValidManagerOverride($validated['manager_pin'] ?? null);
+        $managerApprover = $this->resolveManagerApprover($validated['manager_pin'] ?? null);
+        $managerOverrideApproved = $managerApprover !== null;
 
         try {
             $sale = DB::transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
@@ -124,13 +127,17 @@ class POSApiController extends Controller
 
                     $quantity = round((float) $cartItem['quantity'], 2);
 
-                    if (! $product->allow_fractional_sales && floor($quantity) !== $quantity) {
+                    if ($quantity === 0.0) {
+                        throw new RuntimeException("Product {$product->name} cannot be checked out with a zero quantity.");
+                    }
+
+                    if (! $product->allow_fractional_sales && floor(abs($quantity)) !== abs($quantity)) {
                         throw new RuntimeException("Product {$product->name} does not allow fractional sales.");
                     }
 
                     $availableStock = round((float) $product->stock_quantity, 2);
 
-                    if ($availableStock < $quantity) {
+                    if ($quantity > 0 && $availableStock < $quantity) {
                         throw new RuntimeException("Insufficient stock for product {$product->name}.");
                     }
 
@@ -230,6 +237,11 @@ class POSApiController extends Controller
                     $normalizedPayments[0]['amount'] = $grandTotal;
                 }
 
+                $normalizedPayments = $this->normalizePayments(
+                    $normalizedPayments,
+                    $claimedIncomingPayment
+                );
+
                 $paymentsTotal = round(
                     collect($normalizedPayments)->sum(fn (array $payment): float => round((float) $payment['amount'], 2)),
                     2
@@ -249,6 +261,11 @@ class POSApiController extends Controller
                     throw new RuntimeException('Credit sales are disabled for this shop.');
                 }
 
+                $duplicateSignal = $this->detectDuplicateMpesaSignal(
+                    $normalizedPayments,
+                    $claimedIncomingPayment
+                );
+
                 $sale = Sale::query()->create([
                     'user_id' => $cashierId,
                     'customer_id' => $customer?->id ?? ($validated['customer_id'] ?? null),
@@ -257,6 +274,8 @@ class POSApiController extends Controller
                     'discount_total' => $discountTotal,
                     'grand_total' => $grandTotal,
                     'status' => 'completed',
+                    'is_suspected_duplicate' => $duplicateSignal['is_suspected_duplicate'],
+                    'suspected_duplicate_reason' => $duplicateSignal['reason'],
                     'receipt_number' => $this->generateReceiptNumber(),
                 ]);
 
@@ -270,7 +289,11 @@ class POSApiController extends Controller
                         'subtotal' => $lineItem['subtotal'],
                     ]);
 
-                    $lineItem['product']->decrement('stock_quantity', $lineItem['quantity']);
+                    if ($lineItem['quantity'] > 0) {
+                        $lineItem['product']->decrement('stock_quantity', $lineItem['quantity']);
+                    } else {
+                        $lineItem['product']->increment('stock_quantity', abs($lineItem['quantity']));
+                    }
                 }
 
                 $mpesaClaimAttached = false;
@@ -292,6 +315,8 @@ class POSApiController extends Controller
                         'sale_id' => $sale->id,
                         'method' => $paymentData['method'],
                         'amount' => round((float) $paymentData['amount'], 2),
+                        'phone_number' => $paymentData['phone_number'],
+                        'phone_number_normalized' => $paymentData['phone_number_normalized'],
                         'reference_number' => $referenceNumber,
                         'status' => $paymentData['method'] === 'credit_deni'
                             ? 'pending'
@@ -341,6 +366,15 @@ class POSApiController extends Controller
                     PrintReceiptToHardware::dispatch($sale)->afterCommit();
                 }
 
+                AuditLog::query()->create([
+                    'user_id' => $cashierId,
+                    'action' => $grandTotal < 0 ? 'checkout_refund' : 'checkout_sale',
+                    'description' => $grandTotal < 0
+                        ? "Refund checkout completed for receipt {$sale->receipt_number}."
+                        : "Sale checkout completed for receipt {$sale->receipt_number}.",
+                    'reference_id' => $sale->id,
+                ]);
+
                 return $sale->load([
                     'customer',
                     'saleItems.product.taxCategory',
@@ -371,10 +405,19 @@ class POSApiController extends Controller
     {
         $validated = $request->validate([
             'sale_id' => ['required', 'uuid'],
+            'manager_pin' => ['required', 'string', 'regex:/^\d{4}(\d{2})?$/'],
         ]);
 
+        $managerApprover = $this->resolveManagerApprover($validated['manager_pin']);
+
+        if ($managerApprover === null) {
+            return response()->json([
+                'message' => 'Manager PIN required to void a finalized sale.',
+            ], 422);
+        }
+
         try {
-            $sale = DB::transaction(function () use ($validated): Sale {
+            $sale = DB::transaction(function () use ($validated, $managerApprover, $request): Sale {
                 /** @var Sale $sale */
                 $sale = Sale::query()
                     ->with('saleItems')
@@ -383,6 +426,10 @@ class POSApiController extends Controller
 
                 if ($sale->status === 'voided') {
                     throw new RuntimeException('Sale is already voided.');
+                }
+
+                if ($sale->status !== 'completed') {
+                    throw new RuntimeException('Only finalized completed sales can be voided.');
                 }
 
                 $productIds = $sale->saleItems
@@ -407,6 +454,13 @@ class POSApiController extends Controller
 
                 $sale->update([
                     'status' => 'voided',
+                ]);
+
+                AuditLog::query()->create([
+                    'user_id' => $managerApprover->id,
+                    'action' => 'void_sale',
+                    'description' => "Sale {$sale->receipt_number} voided after manager approval for cashier {$request->user()?->name}.",
+                    'reference_id' => $sale->id,
                 ]);
 
                 return $sale->load([
@@ -491,6 +545,23 @@ class POSApiController extends Controller
         ]);
     }
 
+    public function systemClockAnchor(): JsonResponse
+    {
+        $timestamps = collect([
+            Sale::query()->max('created_at'),
+            Payment::query()->max('created_at'),
+            IncomingMpesaPayment::query()->max('created_at'),
+            AuditLog::query()->max('created_at'),
+        ])->filter();
+
+        return response()->json([
+            'server_time' => now()->toISOString(),
+            'latest_transaction_created_at' => $timestamps->isEmpty()
+                ? null
+                : Carbon::parse($timestamps->max())->toISOString(),
+        ]);
+    }
+
     private function expiresWithin48Hours(CarbonInterface|string|null $batchExpiryDate): bool
     {
         if ($batchExpiryDate === null) {
@@ -517,20 +588,20 @@ class POSApiController extends Controller
         return (int) max(0, $receivedDate->startOfDay()->diffInDays(now()->startOfDay(), false));
     }
 
-    private function hasValidManagerOverride(?string $pin): bool
+    private function resolveManagerApprover(?string $pin): ?User
     {
         if ($pin === null || $pin === '') {
-            return false;
+            return null;
         }
 
         /** @var User $user */
         foreach (User::query()->whereNotNull('pin')->whereIn('role', ['manager', 'admin'])->cursor() as $user) {
             if (Hash::check($pin, $user->pin)) {
-                return true;
+                return $user;
             }
         }
 
-        return false;
+        return null;
     }
 
     private function resolveSaleCustomer(array $validated, bool $creditSaleRequested): ?Customer
@@ -567,5 +638,73 @@ class POSApiController extends Controller
         } while (Sale::query()->where('receipt_number', $receiptNumber)->exists());
 
         return $receiptNumber;
+    }
+
+    private function normalizePayments(array $payments, ?IncomingMpesaPayment $claimedIncomingPayment): array
+    {
+        return collect($payments)->map(function (array $payment) use ($claimedIncomingPayment): array {
+            $phoneNumber = $payment['phone_number'] ?? null;
+            $phoneNumberNormalized = Customer::normalizePhone($phoneNumber);
+
+            if (
+                $payment['method'] === 'mpesa' &&
+                $claimedIncomingPayment !== null &&
+                $phoneNumberNormalized === null
+            ) {
+                $phoneNumber = $claimedIncomingPayment->phone_number;
+                $phoneNumberNormalized = $claimedIncomingPayment->phone_number_normalized;
+            }
+
+            return [
+                'method' => $payment['method'],
+                'amount' => round((float) $payment['amount'], 2),
+                'phone_number' => $phoneNumber,
+                'phone_number_normalized' => $phoneNumberNormalized,
+                'reference_number' => $payment['reference_number'] ?? null,
+                'status' => $payment['status'] ?? 'completed',
+            ];
+        })->all();
+    }
+
+    private function detectDuplicateMpesaSignal(array $payments, ?IncomingMpesaPayment $claimedIncomingPayment): array
+    {
+        $windowStart = now()->subMinutes(60);
+
+        foreach ($payments as $payment) {
+            if ($payment['method'] !== 'mpesa' || $payment['phone_number_normalized'] === null) {
+                continue;
+            }
+
+            $amount = round((float) $payment['amount'], 2);
+
+            $matchingIncomingPayment = IncomingMpesaPayment::query()
+                ->where('amount', $amount)
+                ->where('phone_number_normalized', $payment['phone_number_normalized'])
+                ->where('created_at', '>=', $windowStart)
+                ->when(
+                    $claimedIncomingPayment !== null,
+                    fn ($builder) => $builder->where('id', '!=', $claimedIncomingPayment->id)
+                )
+                ->exists();
+
+            $matchingHistoricalPayment = Payment::query()
+                ->where('method', 'mpesa')
+                ->where('amount', $amount)
+                ->where('phone_number_normalized', $payment['phone_number_normalized'])
+                ->where('created_at', '>=', $windowStart)
+                ->exists();
+
+            if ($matchingIncomingPayment || $matchingHistoricalPayment) {
+                return [
+                    'is_suspected_duplicate' => true,
+                    'reason' => 'Exact M-PESA amount and phone match detected within the last 60 minutes.',
+                ];
+            }
+        }
+
+        return [
+            'is_suspected_duplicate' => false,
+            'reason' => null,
+        ];
     }
 }

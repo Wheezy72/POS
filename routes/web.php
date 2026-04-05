@@ -22,12 +22,12 @@ Route::view('/dashboard', 'admin.dashboard');
 Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
     Route::post('/checkout', [POSApiController::class, 'checkout']);
+    Route::get('/system-clock-anchor', [POSApiController::class, 'systemClockAnchor']);
     Route::get('/mpesa/live-feed', [PaymentApiController::class, 'liveFeed']);
     Route::post('/mpesa/stk-push', [PaymentApiController::class, 'stkPush']);
     Route::post('/mpesa/stk-status', [PaymentApiController::class, 'stkStatus']);
     Route::post('/mpesa-verify', [POSApiController::class, 'verifyMpesaTransaction']);
-    Route::post('/void-sale', [POSApiController::class, 'voidSale'])
-        ->middleware('RequireManagerPin');
+    Route::post('/void-sale', [POSApiController::class, 'voidSale']);
 });
 
 Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
@@ -43,6 +43,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/api/logout', [SecurityApiController::class, 'logout']);
     Route::post('/api/shifts/open', [SecurityApiController::class, 'openShift']);
     Route::post('/api/shifts/close', [SecurityApiController::class, 'closeShift']);
+    Route::post('/api/shifts/cash-drawer-transactions', [SecurityApiController::class, 'recordCashDrawerTransaction']);
 });
 
 Route::middleware(['auth', 'role:admin,manager'])->prefix('api/admin')->group(function (): void {

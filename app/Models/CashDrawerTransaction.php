@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Payment extends Model
+class CashDrawerTransaction extends Model
 {
     use HasUuids;
 
@@ -16,12 +16,16 @@ class Payment extends Model
     {
         return [
             'amount' => 'decimal:2',
-            'phone_number' => 'encrypted',
         ];
     }
 
-    public function sale(): BelongsTo
+    public function shift(): BelongsTo
     {
-        return $this->belongsTo(Sale::class);
+        return $this->belongsTo(Shift::class);
+    }
+
+    public function cashier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cashier_id');
     }
 }

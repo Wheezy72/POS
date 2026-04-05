@@ -21,15 +21,34 @@ class AuditLog extends Model
                 ->first();
 
             if ($previousLog === null) {
+                $auditLog->previous_hash = null;
+                $auditLog->integrity_hash = hash(
+                    'sha256',
+                    implode('|', [
+                        $auditLog->user_id,
+                        $auditLog->action,
+                        $auditLog->description,
+                        $auditLog->reference_id,
+                        'root',
+                    ])
+                );
+
                 return;
             }
 
-            // Each log stores a fingerprint of the record that came immediately before it.
-            // If someone manually edits or removes historical rows in SQLite, the chain breaks
-            // and forensic review can detect the tampering.
-            $auditLog->previous_hash = hash(
+            $auditLog->previous_hash = $previousLog->integrity_hash ?: hash(
                 'sha256',
                 $previousLog->id . '|' . $previousLog->created_at?->toISOString()
+            );
+            $auditLog->integrity_hash = hash(
+                'sha256',
+                implode('|', [
+                    $auditLog->user_id,
+                    $auditLog->action,
+                    $auditLog->description,
+                    $auditLog->reference_id,
+                    $auditLog->previous_hash,
+                ])
             );
         });
     }

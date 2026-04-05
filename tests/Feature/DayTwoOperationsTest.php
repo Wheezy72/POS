@@ -37,8 +37,9 @@ class DayTwoOperationsTest extends TestCase
 
     public function test_credit_sale_is_blocked_when_customer_limit_would_be_exceeded(): void
     {
-        SystemSetting::query()->create([
+        SystemSetting::query()->updateOrCreate([
             'key' => 'enable_credit_sales',
+        ], [
             'value' => 'true',
         ]);
 
