@@ -1,62 +1,57 @@
 <template>
-    <Head title="Duka POS Terminal" />
+    <Head title="POS Terminal" />
 
-    <div class="min-h-screen bg-slate-950 text-slate-100">
-        <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-3 px-3 py-3">
-            <header class="grid gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_14rem]">
-                <section class="border border-slate-700 bg-slate-900 px-4 py-3">
-                    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">Clock</p>
-                    <p class="mt-2 text-3xl font-black tracking-[0.12em] text-emerald-300">{{ clock }}</p>
-                    <p class="mt-2 text-[11px] uppercase tracking-[0.18em] text-slate-500">Scanner-first retail terminal</p>
+    <div class="min-h-screen bg-slate-100 text-slate-900">
+        <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-4 px-4 py-4">
+            <header class="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)_14rem]">
+                <section class="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Clock</p>
+                    <p class="mt-2 text-3xl font-black tracking-[0.08em] text-emerald-600">{{ clock }}</p>
                 </section>
 
-                <section class="border border-yellow-500/40 bg-slate-900 px-4 py-3">
+                <section class="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">Transaction ID</p>
-                            <p class="mt-1 font-mono text-lg font-bold text-yellow-300">{{ transactionId }}</p>
+                            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Transaction</p>
+                            <p class="mt-1 font-mono text-lg font-bold text-slate-900">{{ transactionId }}</p>
                         </div>
                         <div class="text-right text-[11px] uppercase tracking-[0.18em] text-slate-500">
                             <p>Operator</p>
-                            <p class="mt-1 font-semibold text-slate-300">{{ currentUser ? currentUser.name : 'Register locked' }}</p>
+                            <p class="mt-1 font-semibold text-slate-900">{{ currentUser ? currentUser.name : 'Register locked' }}</p>
                         </div>
                     </div>
 
-                    <label class="mt-3 block text-[11px] font-bold uppercase tracking-[0.25em] text-yellow-300">
-                        [F8] Barcode input
+                    <label class="mt-4 block text-[11px] font-bold uppercase tracking-[0.25em] text-slate-500">
+                        Barcode or SKU
                     </label>
                     <input
                         ref="scannerInput"
                         v-model.trim="barcode"
                         type="text"
                         autocomplete="off"
-                        class="mt-1 h-16 w-full border border-yellow-400 bg-yellow-100 px-4 text-2xl font-black tracking-wide text-slate-950 outline-none ring-0 placeholder:font-semibold placeholder:text-slate-500 focus:border-yellow-300"
-                        placeholder="Scan barcode or type SKU then press Enter"
+                        class="mt-2 h-16 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 text-2xl font-black tracking-wide text-slate-950 outline-none ring-0 placeholder:font-semibold placeholder:text-slate-400 focus:border-sky-500 focus:bg-white"
+                        placeholder="Scan barcode or type SKU"
                         @keydown.enter.prevent="searchProducts()"
                     >
                 </section>
 
-                <section class="border border-slate-700 bg-slate-900 px-4 py-3 text-right">
-                    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">Session</p>
-                    <p class="mt-2 text-sm font-bold uppercase tracking-[0.18em]" :class="currentUser ? 'text-emerald-300' : 'text-red-300'">
+                <section class="rounded-3xl border border-slate-200 bg-white px-5 py-4 text-right shadow-sm">
+                    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Session</p>
+                    <p class="mt-2 text-sm font-bold uppercase tracking-[0.18em]" :class="currentUser ? 'text-emerald-600' : 'text-red-600'">
                         {{ currentUser ? currentUser.role : 'Locked' }}
                     </p>
-                    <p class="mt-3 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        Esc closes modals instantly
-                    </p>
-                    <p class="mt-2 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        Search {{ searchResults.length }} results
+                    <p class="mt-4 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                        {{ searchResults.length }} results ready
                     </p>
                 </section>
             </header>
 
-            <main class="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
+            <main class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_13rem]">
                 <section class="grid min-h-0 gap-3">
-                    <section class="min-h-0 border border-slate-700 bg-slate-900">
-                        <div class="flex items-center justify-between border-b border-slate-700 px-3 py-2">
+                    <section class="min-h-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                             <div>
-                                <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">The Cart</p>
-                                <p class="text-xs text-slate-500">High-density cashier grid</p>
+                                <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Cart</p>
                             </div>
                             <div class="text-right text-xs uppercase tracking-[0.18em] text-slate-500">
                                 <p>{{ totalUnits.toFixed(2) }} units</p>
@@ -66,59 +61,59 @@
 
                         <div class="overflow-auto">
                             <table class="min-w-full border-collapse text-sm">
-                                <thead class="bg-slate-950 text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                                <thead class="bg-slate-50 text-[11px] uppercase tracking-[0.18em] text-slate-500">
                                     <tr>
-                                        <th class="border-b border-r border-slate-700 px-2 py-2 text-left">#</th>
-                                        <th class="border-b border-r border-slate-700 px-2 py-2 text-left">Item</th>
-                                        <th class="border-b border-r border-slate-700 px-2 py-2 text-right">Price</th>
-                                        <th class="border-b border-r border-slate-700 px-2 py-2 text-center">Qty</th>
-                                        <th class="border-b border-r border-slate-700 px-2 py-2 text-right">Disc</th>
-                                        <th class="border-b border-slate-700 px-2 py-2 text-right">Total</th>
+                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-left">#</th>
+                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-left">Item</th>
+                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-right">Price</th>
+                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-center">Qty</th>
+                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-right">Disc</th>
+                                        <th class="border-b border-slate-200 px-2 py-2 text-right">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-if="cart.length === 0">
-                                        <td colspan="6" class="px-3 py-10 text-center text-sm text-slate-500">
-                                            Cart is empty. Scan from the barcode lane or press F2 to search.
+                                        <td colspan="6" class="px-3 py-12 text-center text-sm text-slate-500">
+                                            Cart is empty.
                                         </td>
                                     </tr>
-                                    <tr v-for="(item, index) in cart" :key="item.product_id" class="odd:bg-slate-900 even:bg-slate-950/70">
-                                        <td class="border-b border-r border-slate-800 px-2 py-2 font-mono text-slate-400">{{ index + 1 }}</td>
-                                        <td class="border-b border-r border-slate-800 px-2 py-2">
-                                            <p class="font-semibold text-slate-100">{{ item.name }}</p>
+                                    <tr v-for="(item, index) in cart" :key="item.product_id" class="odd:bg-white even:bg-slate-50/70">
+                                        <td class="border-b border-r border-slate-200 px-2 py-2 font-mono text-slate-500">{{ index + 1 }}</td>
+                                        <td class="border-b border-r border-slate-200 px-2 py-2">
+                                            <p class="font-semibold text-slate-900">{{ item.name }}</p>
                                             <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ item.sku || 'Manual item' }}</p>
                                         </td>
-                                        <td class="border-b border-r border-slate-800 px-2 py-2 text-right font-semibold">
+                                        <td class="border-b border-r border-slate-200 px-2 py-2 text-right font-semibold">
                                             {{ formatCurrency(effectiveUnitPrice(item)) }}
                                         </td>
-                                        <td class="border-b border-r border-slate-800 px-2 py-2">
+                                        <td class="border-b border-r border-slate-200 px-2 py-2">
                                             <div class="flex items-center justify-center gap-1">
-                                                <button class="h-8 w-8 border border-slate-600 bg-slate-800 font-bold hover:bg-slate-700" @click="changeQty(item, -1)">-</button>
+                                                <button class="h-8 w-8 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-100" @click="changeQty(item, -1)">-</button>
                                                 <input
                                                     v-model.number="item.quantity"
                                                     type="number"
                                                     min="0.25"
                                                     step="0.25"
-                                                    class="h-8 w-16 border border-slate-600 bg-slate-950 px-1 text-center font-semibold outline-none"
+                                                    class="h-8 w-16 rounded-xl border border-slate-300 bg-slate-50 px-1 text-center font-semibold outline-none"
                                                     @change="normalizeQuantity(item)"
                                                 >
-                                                <button class="h-8 w-8 border border-slate-600 bg-slate-800 font-bold hover:bg-slate-700" @click="changeQty(item, 1)">+</button>
+                                                <button class="h-8 w-8 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-100" @click="changeQty(item, 1)">+</button>
                                             </div>
                                         </td>
-                                        <td class="border-b border-r border-slate-800 px-2 py-2">
+                                        <td class="border-b border-r border-slate-200 px-2 py-2">
                                             <input
                                                 v-model.number="item.discount"
                                                 type="number"
                                                 min="0"
                                                 step="0.01"
-                                                class="h-8 w-full border border-slate-600 bg-slate-950 px-2 text-right outline-none"
+                                                class="h-8 w-full rounded-xl border border-slate-300 bg-slate-50 px-2 text-right outline-none"
                                                 @change="normalizeDiscount(item)"
                                             >
                                         </td>
-                                        <td class="border-b border-slate-800 px-2 py-2 text-right">
+                                        <td class="border-b border-slate-200 px-2 py-2 text-right">
                                             <div class="flex items-center justify-end gap-2">
-                                                <span class="font-bold text-yellow-300">{{ formatCurrency(lineTotal(item)) }}</span>
-                                                <button class="border border-red-500/40 bg-red-500/10 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-red-300 hover:bg-red-500/20" @click="removeItem(item.product_id)">
+                                                <span class="font-bold text-slate-900">{{ formatCurrency(lineTotal(item)) }}</span>
+                                                <button class="rounded-xl border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-red-600 hover:bg-red-100" @click="removeItem(item.product_id)">
                                                     Del
                                                 </button>
                                             </div>
@@ -129,68 +124,66 @@
                         </div>
                     </section>
 
-                    <section class="grid gap-3 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                        <section class="border border-slate-700 bg-slate-900">
-                            <div class="flex items-center justify-between border-b border-slate-700 px-3 py-2">
+                    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                        <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                                 <div>
-                                    <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Search results</p>
-                                    <p class="text-xs text-slate-500">Scanner misses and product lookups</p>
+                                    <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Search results</p>
                                 </div>
-                                <button class="border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300 hover:bg-sky-500/20" @click="showSearchModal = true">
+                                <button class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700 hover:bg-sky-100" @click="openSearchModal()">
                                     [F2] Search
                                 </button>
                             </div>
 
                             <div class="max-h-56 overflow-auto">
-                                <div v-if="searchBusy" class="px-3 py-6 text-sm text-slate-500">Searching…</div>
+                                <div v-if="searchBusy" class="px-4 py-6 text-sm text-slate-500">Searching…</div>
                                 <div v-else-if="searchResults.length === 0" class="px-3 py-6 text-sm text-slate-500">
-                                    No staged results. Scan a barcode or open the search panel.
+                                    Start typing to search products.
                                 </div>
                                 <button
                                     v-for="product in searchResults"
                                     :key="product.id"
-                                    class="grid w-full grid-cols-[1fr_auto_auto] gap-3 border-b border-slate-800 px-3 py-2 text-left hover:bg-slate-800"
+                                    class="grid w-full grid-cols-[1fr_auto_auto] gap-3 border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
                                     @click="addProductToCart(product)"
                                 >
                                     <div class="min-w-0">
-                                        <p class="truncate font-semibold text-slate-100">{{ product.name }}</p>
+                                        <p class="truncate font-semibold text-slate-900">{{ product.name }}</p>
                                         <p class="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ product.sku }}</p>
                                     </div>
-                                    <p class="text-right text-sm font-bold text-slate-200">{{ formatCurrency(Number(product.base_price)) }}</p>
-                                    <p class="text-right text-[11px] uppercase tracking-[0.16em]" :class="Number(product.stock_quantity) < 10 ? 'text-red-300' : 'text-slate-500'">
+                                    <p class="text-right text-sm font-bold text-slate-900">{{ formatCurrency(Number(product.base_price)) }}</p>
+                                    <p class="text-right text-[11px] uppercase tracking-[0.16em]" :class="Number(product.stock_quantity) < 10 ? 'text-red-600' : 'text-slate-500'">
                                         {{ Number(product.stock_quantity).toFixed(2) }}
                                     </p>
                                 </button>
                             </div>
                         </section>
 
-                        <section class="border border-slate-700 bg-slate-900">
-                            <div class="flex items-center justify-between border-b border-slate-700 px-3 py-2">
+                        <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                                 <div>
-                                    <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">M-PESA live feed</p>
-                                    <p class="text-xs text-slate-500">Inbound C2B webhook lane</p>
+                                    <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">M-PESA live feed</p>
                                 </div>
-                                <button class="border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-300 hover:bg-emerald-500/20" @click="fetchLivePayments()">
+                                <button class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 hover:bg-emerald-100" @click="fetchLivePayments()">
                                     Refresh
                                 </button>
                             </div>
                             <div class="max-h-56 overflow-auto">
-                                <div v-if="liveFeedBusy" class="px-3 py-6 text-sm text-slate-500">Loading live feed…</div>
-                                <div v-else-if="livePayments.length === 0" class="px-3 py-6 text-sm text-slate-500">No pending M-PESA deposits.</div>
+                                <div v-if="liveFeedBusy" class="px-4 py-6 text-sm text-slate-500">Loading live feed…</div>
+                                <div v-else-if="livePayments.length === 0" class="px-4 py-6 text-sm text-slate-500">No pending M-PESA deposits.</div>
                                 <button
                                     v-for="payment in livePayments"
                                     :key="payment.id"
-                                    class="w-full border-b border-slate-800 px-3 py-2 text-left hover:bg-slate-800"
-                                    :class="selectedLivePayment?.id === payment.id ? 'bg-emerald-500/10' : ''"
+                                    class="w-full border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
+                                    :class="selectedLivePayment?.id === payment.id ? 'bg-emerald-50' : ''"
                                     @click="selectLivePayment(payment)"
                                 >
                                     <div class="flex items-center justify-between gap-3">
                                         <div class="min-w-0">
-                                            <p class="truncate font-semibold text-slate-100">{{ payment.customer_name }}</p>
+                                            <p class="truncate font-semibold text-slate-900">{{ payment.customer_name }}</p>
                                             <p class="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ payment.transaction_code }}</p>
                                         </div>
                                         <div class="text-right">
-                                            <p class="font-bold text-emerald-300">{{ formatCurrency(Number(payment.amount)) }}</p>
+                                            <p class="font-bold text-emerald-600">{{ formatCurrency(Number(payment.amount)) }}</p>
                                             <p class="text-[11px] text-slate-500">{{ shortTimestamp(payment.created_at) }}</p>
                                         </div>
                                     </div>
@@ -201,49 +194,45 @@
                 </section>
 
                 <aside class="grid gap-3">
-                    <button class="border border-yellow-500 bg-yellow-300 px-3 py-4 text-left text-slate-950 hover:bg-yellow-200" @click="newSale()">
+                    <button class="rounded-3xl border border-yellow-300 bg-yellow-300 px-4 py-4 text-left text-slate-950 shadow-sm hover:bg-yellow-200" @click="newSale()">
                         <p class="text-lg font-black">[F1] New</p>
-                        <p class="mt-1 text-[11px] font-bold uppercase tracking-[0.18em]">Clear cart and reset sale</p>
                     </button>
-                    <button class="border border-sky-500 bg-sky-600 px-3 py-4 text-left text-white hover:bg-sky-500" @click="openSearchModal()">
+                    <button class="rounded-3xl border border-sky-600 bg-sky-600 px-4 py-4 text-left text-white shadow-sm hover:bg-sky-500" @click="openSearchModal()">
                         <p class="text-lg font-black">[F2] Search</p>
-                        <p class="mt-1 text-[11px] font-bold uppercase tracking-[0.18em]">Lookup products</p>
                     </button>
-                    <button class="border border-emerald-500 bg-emerald-600 px-3 py-4 text-left text-white hover:bg-emerald-500" @click="openPayModal()">
+                    <button class="rounded-3xl border border-emerald-600 bg-emerald-600 px-4 py-4 text-left text-white shadow-sm hover:bg-emerald-500" @click="openPayModal()">
                         <p class="text-lg font-black">[F4] Pay</p>
-                        <p class="mt-1 text-[11px] font-bold uppercase tracking-[0.18em]">Cash, STK, or C2B claim</p>
                     </button>
-                    <button class="border border-red-500 bg-red-600 px-3 py-4 text-left text-white hover:bg-red-500" @click="logout()">
+                    <button class="rounded-3xl border border-red-600 bg-red-600 px-4 py-4 text-left text-white shadow-sm hover:bg-red-500" @click="logout()">
                         <p class="text-lg font-black">[F10] Logout</p>
-                        <p class="mt-1 text-[11px] font-bold uppercase tracking-[0.18em]">Lock the register</p>
                     </button>
 
-                    <section class="border border-slate-700 bg-slate-900 px-3 py-3">
-                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Selected inbound payment</p>
+                    <section class="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Selected payment</p>
                         <div v-if="selectedLivePayment" class="mt-2">
-                            <p class="font-semibold text-slate-100">{{ selectedLivePayment.customer_name }}</p>
+                            <p class="font-semibold text-slate-900">{{ selectedLivePayment.customer_name }}</p>
                             <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ selectedLivePayment.transaction_code }}</p>
-                            <p class="mt-1 font-bold text-emerald-300">{{ formatCurrency(Number(selectedLivePayment.amount)) }}</p>
+                            <p class="mt-1 font-bold text-emerald-600">{{ formatCurrency(Number(selectedLivePayment.amount)) }}</p>
                         </div>
                         <p v-else class="mt-2 text-sm text-slate-500">Nothing selected.</p>
                     </section>
 
-                    <section class="border border-slate-700 bg-slate-900 px-3 py-3">
-                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Pending STK</p>
-                        <p class="mt-2 font-mono text-sm text-yellow-300">{{ stkCheckoutRequestId || 'None' }}</p>
+                    <section class="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Pending STK</p>
+                        <p class="mt-2 font-mono text-sm text-amber-600">{{ stkCheckoutRequestId || 'None' }}</p>
                         <p class="mt-2 text-xs text-slate-500">{{ stkStatusMessage }}</p>
                     </section>
                 </aside>
             </main>
 
-            <footer class="ml-auto w-full max-w-[28rem] border border-yellow-500 bg-yellow-300 text-slate-950">
+            <footer class="ml-auto w-full max-w-[28rem] rounded-3xl border border-slate-200 bg-white text-slate-950 shadow-sm">
                 <div class="grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 px-4 py-4">
                     <p class="text-sm font-bold uppercase tracking-[0.18em]">Subtotal</p>
                     <p class="text-right text-lg font-black">{{ formatCurrency(subtotal) }}</p>
                     <p class="text-sm font-bold uppercase tracking-[0.18em]">Tax</p>
                     <p class="text-right text-lg font-black">{{ formatCurrency(tax) }}</p>
-                    <p class="border-t border-slate-950 pt-2 text-lg font-black uppercase tracking-[0.18em]">Grand Total</p>
-                    <p class="border-t border-slate-950 pt-2 text-right text-4xl font-black tracking-tight">{{ formatCurrency(grandTotal) }}</p>
+                    <p class="border-t border-slate-200 pt-2 text-lg font-black uppercase tracking-[0.18em]">Grand Total</p>
+                    <p class="border-t border-slate-200 pt-2 text-right text-4xl font-black tracking-tight text-emerald-600">{{ formatCurrency(grandTotal) }}</p>
                 </div>
             </footer>
         </div>
@@ -253,21 +242,20 @@
                 v-for="toast in toasts"
                 :key="toast.id"
                 class="border px-3 py-2 shadow-lg"
-                :class="toast.variant === 'error' ? 'border-red-500 bg-red-950 text-red-100' : toast.variant === 'success' ? 'border-emerald-500 bg-emerald-950 text-emerald-100' : 'border-slate-500 bg-slate-900 text-slate-100'"
+                :class="toast.variant === 'error' ? 'border-red-200 bg-white text-red-700' : toast.variant === 'success' ? 'border-emerald-200 bg-white text-emerald-700' : 'border-slate-200 bg-white text-slate-900'"
             >
                 <p class="font-bold uppercase tracking-[0.18em]">{{ toast.title }}</p>
                 <p class="mt-1 text-sm">{{ toast.message }}</p>
             </div>
         </div>
 
-        <div v-if="showSearchModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-4">
-            <div class="w-full max-w-4xl border border-slate-600 bg-slate-900">
-                <div class="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+        <div v-if="showSearchModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+            <div class="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                     <div>
-                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Product search</p>
-                        <p class="text-sm text-slate-500">Press Esc to close</p>
+                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Product search</p>
                     </div>
-                    <button class="border border-slate-600 px-3 py-2 text-sm font-bold hover:bg-slate-800" @click="closeModals()">Esc</button>
+                    <button class="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold hover:bg-slate-50" @click="closeModals()">Esc</button>
                 </div>
                 <div class="p-4">
                     <input
@@ -275,23 +263,25 @@
                         v-model.trim="searchQuery"
                         type="text"
                         autocomplete="off"
-                        class="h-14 w-full border border-sky-500 bg-slate-950 px-4 text-lg font-bold outline-none"
+                        class="h-14 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 text-lg font-bold outline-none focus:border-sky-500 focus:bg-white"
                         placeholder="Search by barcode, SKU, or product name"
                         @keydown.enter.prevent="searchProducts(searchQuery)"
                     >
-                    <div class="mt-4 max-h-[24rem] overflow-auto border border-slate-700">
+                    <div class="mt-4 max-h-[24rem] overflow-auto rounded-2xl border border-slate-200">
+                        <div v-if="searchBusy" class="px-4 py-6 text-sm text-slate-500">Searching…</div>
+                        <div v-else-if="searchResults.length === 0" class="px-4 py-6 text-sm text-slate-500">No products found.</div>
                         <button
                             v-for="product in searchResults"
                             :key="product.id"
-                            class="grid w-full grid-cols-[1fr_auto_auto] gap-3 border-b border-slate-800 px-3 py-2 text-left hover:bg-slate-800"
+                            class="grid w-full grid-cols-[1fr_auto_auto] gap-3 border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
                             @click="addProductToCart(product); showSearchModal = false"
                         >
                             <div class="min-w-0">
-                                <p class="truncate font-semibold text-slate-100">{{ product.name }}</p>
+                                <p class="truncate font-semibold text-slate-900">{{ product.name }}</p>
                                 <p class="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ product.sku }}</p>
                             </div>
-                            <p class="font-bold text-yellow-300">{{ formatCurrency(Number(product.base_price)) }}</p>
-                            <p class="text-[11px] uppercase tracking-[0.16em]" :class="Number(product.stock_quantity) < 10 ? 'text-red-300' : 'text-slate-500'">
+                            <p class="font-bold text-slate-900">{{ formatCurrency(Number(product.base_price)) }}</p>
+                            <p class="text-[11px] uppercase tracking-[0.16em]" :class="Number(product.stock_quantity) < 10 ? 'text-red-600' : 'text-slate-500'">
                                 {{ Number(product.stock_quantity).toFixed(2) }}
                             </p>
                         </button>
@@ -300,94 +290,88 @@
             </div>
         </div>
 
-        <div v-if="showPayModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/80 p-4">
-            <div class="w-full max-w-5xl border border-slate-600 bg-slate-900">
-                <div class="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+        <div v-if="showPayModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
+            <div class="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                     <div>
-                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Tender sale</p>
-                        <p class="text-sm text-slate-500">Cash, outbound STK, or inbound C2B claim</p>
+                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Tender sale</p>
                     </div>
-                    <button class="border border-slate-600 px-3 py-2 text-sm font-bold hover:bg-slate-800" @click="closeModals()">Esc</button>
+                    <button class="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold hover:bg-slate-50" @click="closeModals()">Esc</button>
                 </div>
 
                 <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
                     <section>
                         <div class="flex gap-2">
-                            <button class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'cash' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'cash'">Cash</button>
-                            <button class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'stk' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'stk'">M-PESA STK</button>
-                            <button class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'live' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'live'">C2B Live Feed</button>
-                            <button v-if="creditSalesEnabled" class="border px-3 py-2 text-sm font-bold" :class="paymentTab === 'credit' ? 'border-yellow-400 bg-yellow-300 text-slate-950' : 'border-slate-600 bg-slate-800'" @click="paymentTab = 'credit'">[F7] Pay Later</button>
+                            <button class="rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTab === 'cash' ? 'border-yellow-300 bg-yellow-300 text-slate-950' : 'border-slate-300 bg-white text-slate-700'" @click="paymentTab = 'cash'">Cash</button>
+                            <button class="rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTab === 'stk' ? 'border-yellow-300 bg-yellow-300 text-slate-950' : 'border-slate-300 bg-white text-slate-700'" @click="paymentTab = 'stk'">M-PESA STK</button>
+                            <button class="rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTab === 'live' ? 'border-yellow-300 bg-yellow-300 text-slate-950' : 'border-slate-300 bg-white text-slate-700'" @click="paymentTab = 'live'">C2B Live Feed</button>
+                            <button v-if="creditSalesEnabled" class="rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTab === 'credit' ? 'border-yellow-300 bg-yellow-300 text-slate-950' : 'border-slate-300 bg-white text-slate-700'" @click="paymentTab = 'credit'">[F7] Pay Later</button>
                         </div>
 
-                        <div v-if="paymentTab === 'cash'" class="mt-4 grid gap-3 border border-slate-700 p-4">
-                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Cash received</label>
-                            <input v-model.number="cashReceived" type="number" min="0" step="0.01" class="h-12 border border-slate-600 bg-slate-950 px-3 text-xl font-black outline-none">
+                        <div v-if="paymentTab === 'cash'" class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Cash received</label>
+                            <input v-model.number="cashReceived" type="number" min="0" step="0.01" class="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-xl font-black outline-none">
                             <div class="grid gap-2 sm:grid-cols-4">
-                                <button v-for="preset in cashPresets" :key="preset" class="border border-slate-600 bg-slate-800 px-3 py-2 text-sm font-bold hover:bg-slate-700" @click="cashReceived = preset">
+                                <button v-for="preset in cashPresets" :key="preset" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold hover:bg-slate-100" @click="cashReceived = preset">
                                     {{ formatCurrency(preset) }}
                                 </button>
                             </div>
-                            <p class="text-sm" :class="cashChange >= 0 ? 'text-emerald-300' : 'text-red-300'">
+                            <p class="text-sm" :class="cashChange >= 0 ? 'text-emerald-600' : 'text-red-600'">
                                 Change: {{ formatCurrency(cashChange) }}
                             </p>
-                            <button class="border border-emerald-500 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="submitCashCheckout()">
+                            <button class="rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="submitCashCheckout()">
                                 Complete cash sale
                             </button>
                         </div>
 
-                        <div v-else-if="paymentTab === 'stk'" class="mt-4 grid gap-3 border border-slate-700 p-4">
-                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Customer phone</label>
-                            <input v-model.trim="stkPhone" type="text" class="h-12 border border-slate-600 bg-slate-950 px-3 text-lg font-bold outline-none" placeholder="2547XXXXXXXX">
-                            <p class="text-sm text-slate-500">This triggers outbound STK push, then polls status until verified.</p>
-                            <button class="border border-emerald-500 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="submitStkCheckout()">
+                        <div v-else-if="paymentTab === 'stk'" class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Customer phone</label>
+                            <input v-model.trim="stkPhone" type="text" class="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-lg font-bold outline-none" placeholder="2547XXXXXXXX">
+                            <button class="rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="submitStkCheckout()">
                                 Start STK and checkout
                             </button>
                         </div>
 
-                        <div v-else-if="paymentTab === 'live'" class="mt-4 grid gap-3 border border-slate-700 p-4">
-                            <p class="text-sm text-slate-500">Select an inbound payment from the live feed. The backend claims it against this sale.</p>
-                            <div class="max-h-64 overflow-auto border border-slate-700">
+                        <div v-else-if="paymentTab === 'live'" class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="max-h-64 overflow-auto rounded-2xl border border-slate-200 bg-white">
                                 <button
                                     v-for="payment in livePayments"
                                     :key="payment.id"
-                                    class="w-full border-b border-slate-800 px-3 py-2 text-left hover:bg-slate-800"
-                                    :class="selectedLivePayment?.id === payment.id ? 'bg-emerald-500/10' : ''"
+                                    class="w-full border-b border-slate-200 px-3 py-2 text-left hover:bg-slate-50"
+                                    :class="selectedLivePayment?.id === payment.id ? 'bg-emerald-50' : ''"
                                     @click="selectLivePayment(payment)"
                                 >
                                     <div class="flex items-center justify-between gap-3">
                                         <div class="min-w-0">
-                                            <p class="truncate font-semibold text-slate-100">{{ payment.customer_name }}</p>
+                                            <p class="truncate font-semibold text-slate-900">{{ payment.customer_name }}</p>
                                             <p class="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ payment.transaction_code }}</p>
                                         </div>
-                                        <p class="font-bold text-emerald-300">{{ formatCurrency(Number(payment.amount)) }}</p>
+                                        <p class="font-bold text-emerald-600">{{ formatCurrency(Number(payment.amount)) }}</p>
                                     </div>
                                 </button>
                             </div>
-                            <button class="border border-emerald-500 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || !selectedLivePayment || cart.length === 0" @click="submitLiveFeedCheckout()">
+                            <button class="rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:opacity-50" :disabled="checkoutBusy || !selectedLivePayment || cart.length === 0" @click="submitLiveFeedCheckout()">
                                 Claim inbound payment and checkout
                             </button>
                         </div>
 
-                        <div v-else class="mt-4 grid gap-3 border border-slate-700 p-4">
-                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Customer phone</label>
-                            <input v-model.trim="customerPhone" type="text" class="h-12 border border-slate-600 bg-slate-950 px-3 text-lg font-bold outline-none" placeholder="2547XXXXXXXX">
-                            <p class="text-sm text-slate-500">The customer must already exist and remain within the configured credit limit.</p>
-                            <button class="border border-yellow-500 bg-yellow-300 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-slate-950 hover:bg-yellow-200 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0 || !customerPhone" @click="submitCreditCheckout()">
+                        <div v-else class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                            <label class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Customer phone</label>
+                            <input v-model.trim="customerPhone" type="text" class="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-lg font-bold outline-none" placeholder="2547XXXXXXXX">
+                            <button class="rounded-2xl border border-yellow-300 bg-yellow-300 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-slate-950 hover:bg-yellow-200 disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0 || !customerPhone" @click="submitCreditCheckout()">
                                 Save as credit sale
                             </button>
                         </div>
                     </section>
 
                     <aside class="grid gap-3">
-                        <section class="border border-slate-700 bg-slate-950 p-4">
-                            <p class="text-[11px] uppercase tracking-[0.22em] text-slate-400">Manual override guard</p>
-                            <label class="mt-3 block text-[11px] uppercase tracking-[0.22em] text-slate-500">Manager PIN</label>
-                            <input v-model.trim="managerPin" type="password" maxlength="6" class="mt-1 h-12 w-full border border-slate-600 bg-slate-900 px-3 text-lg font-bold outline-none" placeholder="Required only below floor">
-                            <p class="mt-2 text-xs text-slate-500">If any line discount drops below the margin floor, checkout returns 422 unless this PIN is valid.</p>
+                        <section class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                            <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Manager PIN</p>
+                            <input v-model.trim="managerPin" type="password" maxlength="6" class="mt-3 h-12 w-full rounded-2xl border border-slate-300 bg-white px-3 text-lg font-bold outline-none" placeholder="Only needed below margin floor">
                         </section>
 
-                        <section class="border border-slate-700 bg-yellow-300 p-4 text-slate-950">
-                            <p class="text-sm font-black uppercase tracking-[0.18em]">Hero Summary</p>
+                        <section class="rounded-3xl border border-yellow-300 bg-yellow-300 p-4 text-slate-950 shadow-sm">
+                            <p class="text-sm font-black uppercase tracking-[0.18em]">Summary</p>
                             <div class="mt-4 grid grid-cols-[1fr_auto] gap-y-2">
                                 <span class="font-bold uppercase tracking-[0.16em]">Subtotal</span>
                                 <span class="text-right font-black">{{ formatCurrency(subtotal) }}</span>
@@ -403,34 +387,30 @@
         </div>
 
         <div v-if="showPinOverlay" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-md">
-            <div class="w-full max-w-md rounded-3xl border border-white/20 bg-white/10 p-6 text-white shadow-2xl backdrop-blur-2xl">
-                <p class="text-[11px] uppercase tracking-[0.25em] text-slate-300">PIN Lock</p>
+            <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl">
+                <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">PIN Lock</p>
                 <h1 class="mt-2 text-3xl font-black">{{ overlayHeading }}</h1>
-                <p class="mt-2 text-sm text-slate-200">The terminal stays blocked until a valid staff PIN is entered.</p>
-                <p v-if="blockedRole" class="mt-2 text-sm text-red-200">
+                <p v-if="blockedRole" class="mt-2 text-sm text-red-600">
                     Logged-in role "{{ blockedRole }}" cannot operate the cashier terminal.
                 </p>
 
-                <label class="mt-5 block text-[11px] font-bold uppercase tracking-[0.25em] text-slate-300">{{ overlayLabel }}</label>
+                <label class="mt-5 block text-[11px] font-bold uppercase tracking-[0.25em] text-slate-500">{{ overlayLabel }}</label>
                 <input
                     ref="pinInput"
                     v-model.trim="pin"
                     type="password"
                     inputmode="numeric"
                     maxlength="6"
-                    class="mt-2 h-14 w-full rounded-2xl border border-white/20 bg-black/20 px-4 text-2xl font-black tracking-[0.4em] outline-none placeholder:tracking-normal placeholder:text-slate-400"
+                    class="mt-2 h-14 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 text-2xl font-black tracking-[0.4em] outline-none placeholder:tracking-normal placeholder:text-slate-400"
                     placeholder="0000"
                     @keydown.enter.prevent="loginWithPin()"
                 >
 
-                <button class="mt-5 w-full rounded-2xl border border-emerald-400 bg-emerald-500 px-4 py-4 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-400 disabled:opacity-50" :disabled="pinBusy" @click="loginWithPin()">
+                <button class="mt-5 w-full rounded-2xl border border-emerald-500 bg-emerald-500 px-4 py-4 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-400 disabled:opacity-50" :disabled="pinBusy" @click="loginWithPin()">
                     {{ pinBusy ? 'Unlocking…' : 'Unlock register' }}
                 </button>
 
-                <div class="mt-4 grid gap-2 text-xs text-slate-300">
-                    <p>Demo PINs: Cashier 0000 · Admin/Manager 1234</p>
-                    <p>Esc closes dialogs; F8 always restores barcode focus after unlock.</p>
-                </div>
+                <p class="mt-4 text-xs text-slate-500">Enter a valid staff PIN to continue.</p>
             </div>
         </div>
     </div>
@@ -491,6 +471,8 @@ let focusTimer = null;
 let liveFeedTimer = null;
 let stkPollTimer = null;
 let audioContext = null;
+let searchDebounceTimer = null;
+let searchRequestSequence = 0;
 
 const subtotal = computed(() => cart.value.reduce((sum, item) => sum + lineSubtotal(item), 0));
 const tax = computed(() => cart.value.reduce((sum, item) => sum + lineTax(item), 0));
@@ -512,6 +494,30 @@ const cashPresets = computed(() => {
 watch([showSearchModal, showPayModal, showPinOverlay], async () => {
     await nextTick();
     focusPriorityInput();
+});
+
+watch(searchQuery, (value) => {
+    if (!showSearchModal.value) {
+        return;
+    }
+
+    queueProductSearch(value, {
+        autoSelectExact: false,
+        notifyOnEmpty: false,
+        openModalOnResults: false,
+    });
+});
+
+watch(barcode, (value) => {
+    if (showSearchModal.value || showPayModal.value || showPinOverlay.value) {
+        return;
+    }
+
+    queueProductSearch(value, {
+        autoSelectExact: false,
+        notifyOnEmpty: false,
+        openModalOnResults: false,
+    });
 });
 
 onMounted(() => {
@@ -547,6 +553,10 @@ onBeforeUnmount(() => {
 
     if (liveFeedTimer) {
         window.clearInterval(liveFeedTimer);
+    }
+
+    if (searchDebounceTimer) {
+        window.clearTimeout(searchDebounceTimer);
     }
 
     stopStkPolling();
@@ -732,14 +742,40 @@ function handleUnauthenticated() {
     focusPinInput();
 }
 
-async function searchProducts(query = barcode.value) {
+function queueProductSearch(query, options = {}) {
+    if (searchDebounceTimer) {
+        window.clearTimeout(searchDebounceTimer);
+    }
+
     const term = String(query ?? '').trim();
 
+    if (term.length < 2) {
+        searchRequestSequence += 1;
+        searchBusy.value = false;
+        searchResults.value = [];
+        return;
+    }
+
+    searchDebounceTimer = window.setTimeout(() => {
+        searchProducts(term, options);
+    }, 220);
+}
+
+async function searchProducts(query = barcode.value, options = {}) {
+    const term = String(query ?? '').trim();
+    const {
+        autoSelectExact = true,
+        notifyOnEmpty = true,
+        openModalOnResults = true,
+    } = options;
+
     if (!term) {
+        searchResults.value = [];
         focusScannerInput(true);
         return;
     }
 
+    const requestId = ++searchRequestSequence;
     searchBusy.value = true;
 
     try {
@@ -747,29 +783,37 @@ async function searchProducts(query = barcode.value) {
             query: term,
         });
 
+        if (requestId !== searchRequestSequence) {
+            return;
+        }
+
         searchResults.value = response.data;
         searchQuery.value = term;
 
         const exactMatch = response.data.find((product) => product.barcode === term || product.sku === term);
 
-        if (exactMatch) {
+        if (autoSelectExact && exactMatch) {
             addProductToCart(exactMatch);
             barcode.value = '';
-            searchResults.value = response.data;
+            searchResults.value = [];
             showSearchModal.value = false;
             focusScannerInput(true);
             return;
         }
 
-        if (response.data.length > 0) {
+        if (openModalOnResults && response.data.length > 0) {
             showSearchModal.value = true;
-        } else {
+        } else if (notifyOnEmpty && response.data.length === 0) {
             toast('No match', `No product matched "${term}".`, 'info');
         }
     } catch (error) {
-        toast('Search failed', error?.response?.data?.message ?? 'Unable to search products.', 'error');
+        if (requestId === searchRequestSequence) {
+            toast('Search failed', error?.response?.data?.message ?? 'Unable to search products.', 'error');
+        }
     } finally {
-        searchBusy.value = false;
+        if (requestId === searchRequestSequence) {
+            searchBusy.value = false;
+        }
     }
 }
 

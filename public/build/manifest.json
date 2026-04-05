@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-D6blfKJ1.css",
+    "file": "assets/app-nASWw1WX.css",
     "name": "app",
     "names": [
       "app.css"
@@ -18,7 +18,7 @@
     "isEntry": true
   },
   "resources/js/Pages/PosTerminal.vue": {
-    "file": "assets/PosTerminal-Do_66waS.js",
+    "file": "assets/PosTerminal--LWDIc1v.js",
     "name": "PosTerminal",
     "src": "resources/js/Pages/PosTerminal.vue",
     "isDynamicEntry": true,
@@ -27,7 +27,7 @@
     ]
   },
   "resources/js/Pages/SetupWizard.vue": {
-    "file": "assets/SetupWizard-DpcN2XPE.js",
+    "file": "assets/SetupWizard-CBmvQ8k4.js",
     "name": "SetupWizard",
     "src": "resources/js/Pages/SetupWizard.vue",
     "isDynamicEntry": true,
@@ -36,7 +36,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-4zSt9vwE.js",
+    "file": "assets/app-DNR0mldM.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -45,7 +45,7 @@
       "resources/js/Pages/SetupWizard.vue"
     ],
     "css": [
-      "assets/app-D6blfKJ1.css"
+      "assets/app-nASWw1WX.css"
     ]
   }
 }
