@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+@source '../../../../app/Filament/**/*.php';
+@source '../../../../resources/views/filament/**/*.blade.php';
+
+.fi-section-content,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-topbar nav,
+.fi-sidebar-nav {
+    border-radius: 0.75rem;
+}
+
+.fi-ta-table thead th {
+    padding-block: 0.45rem;
+    padding-inline: 0.55rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.fi-ta-table tbody td {
+    padding-block: 0.42rem;
+    padding-inline: 0.55rem;
+    font-size: 0.78rem;
+    line-height: 1.15rem;
+}
+
+.fi-ta-record {
+    min-height: 2.2rem;
+}
+
+.fi-fo-field-wrp {
+    margin-bottom: 0.75rem;
+}

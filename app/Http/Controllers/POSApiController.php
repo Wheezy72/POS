@@ -54,6 +54,7 @@ class POSApiController extends Controller
             'cart' => ['required', 'array', 'min:1'],
             'cart.*.product_id' => ['required', 'uuid'],
             'cart.*.quantity' => ['required', 'numeric', 'gt:0'],
+            'cart.*.override_unit_price' => ['nullable', 'numeric', 'gt:0'],
             'payments' => ['required', 'array', 'min:1'],
             'payments.*.method' => ['required', 'in:cash,mpesa,card,credit_deni'],
             'payments.*.amount' => ['required', 'numeric', 'gt:0'],
@@ -126,16 +127,18 @@ class POSApiController extends Controller
 
                     $basePrice = round((float) $product->base_price, 2);
                     $costPrice = round((float) $product->cost_price, 2);
-                    $originalUnitPrice = $basePrice;
+                    $overrideUnitPrice = array_key_exists('override_unit_price', $cartItem) && $cartItem['override_unit_price'] !== null
+                        ? round((float) $cartItem['override_unit_price'], 2)
+                        : null;
                     $priceSource = 'base_price';
 
                     // Rule 1: expiry-driven markdowns.
                     // If the batch expires within 48 hours, the engine automatically cuts the shelf
                     // price by 50% to improve sell-through before the stock becomes waste.
-                    $unitPrice = $basePrice;
+                    $engineUnitPrice = $basePrice;
 
                     if ($this->expiresWithin48Hours($product->batch_expiry_date)) {
-                        $unitPrice = round($basePrice * 0.5, 2);
+                        $engineUnitPrice = round($basePrice * 0.5, 2);
                         $priceSource = 'expiry_markdown';
                     }
 
@@ -159,6 +162,17 @@ class POSApiController extends Controller
                     // up to the minimum safe value unless a valid manager PIN override was supplied.
                     $marginClampApplied = false;
 
+                    if ($overrideUnitPrice !== null) {
+                        if (! $managerOverrideApproved && $overrideUnitPrice < $marginFloor) {
+                            throw new RuntimeException("Manual price override for {$product->name} is below the margin floor of {$marginFloor}. Manager PIN required.");
+                        }
+
+                        $unitPrice = $overrideUnitPrice;
+                        $priceSource = 'manual_override';
+                    } else {
+                        $unitPrice = $engineUnitPrice;
+                    }
+
                     if (! $managerOverrideApproved && $unitPrice < $marginFloor) {
                         $unitPrice = $marginFloor;
                         $marginClampApplied = true;
@@ -169,7 +183,7 @@ class POSApiController extends Controller
                     $lineSubtotal = round($quantity * $unitPrice, 2);
                     $lineTax = round($lineSubtotal * (((float) $product->taxCategory->rate) / 100), 2);
 
-                    if ($unitPrice !== $originalUnitPrice || $marginClampApplied) {
+                    if ($unitPrice !== $basePrice || $marginClampApplied || $overrideUnitPrice !== null) {
                         $pricingAdjustments[] = [
                             'product_id' => $product->id,
                             'product_name' => $product->name,
@@ -177,6 +191,7 @@ class POSApiController extends Controller
                             'base_unit_price' => $basePrice,
                             'final_unit_price' => $unitPrice,
                             'margin_floor' => $marginFloor,
+                            'override_unit_price' => $overrideUnitPrice,
                             'price_source' => $priceSource,
                             'manager_override_used' => $managerOverrideApproved,
                         ];
@@ -450,7 +465,7 @@ class POSApiController extends Controller
             ? $lastReceivedDate->copy()
             : Carbon::parse($lastReceivedDate);
 
-        return max(0, $receivedDate->startOfDay()->diffInDays(now()->startOfDay(), false));
+        return (int) max(0, $receivedDate->startOfDay()->diffInDays(now()->startOfDay(), false));
     }
 
     private function hasValidManagerOverride(?string $pin): bool

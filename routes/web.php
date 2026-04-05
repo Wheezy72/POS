@@ -7,9 +7,13 @@ use App\Http\Controllers\PaymentApiController;
 use App\Http\Controllers\POSApiController;
 use App\Http\Controllers\SecurityApiController;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::view('/', 'welcome');
-Route::view('/pos', 'pos-checkout');
+Route::get('/pos', fn () => Inertia::render('PosTerminal', [
+    'overlayHeading' => 'Unlock the register',
+    'overlayLabel' => 'Staff PIN',
+]));
 Route::view('/dashboard', 'admin.dashboard');
 
 Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {
@@ -35,6 +39,7 @@ Route::prefix('api/auth')->group(function (): void {
 Route::middleware('auth')->group(function (): void {
     Route::post('/api/auth/manager-override', [SecurityApiController::class, 'managerOverride'])
         ->middleware('throttle:manager-override');
+    Route::post('/api/logout', [SecurityApiController::class, 'logout']);
     Route::post('/api/shifts/open', [SecurityApiController::class, 'openShift']);
     Route::post('/api/shifts/close', [SecurityApiController::class, 'closeShift']);
 });
