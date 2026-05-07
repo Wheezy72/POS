@@ -1,6 +1,13 @@
 {
+  "_useToasts-CkvjtAD2.js": {
+    "file": "assets/useToasts-CkvjtAD2.js",
+    "name": "useToasts",
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
   "resources/css/app.css": {
-    "file": "assets/app-pzYGmuRM.css",
+    "file": "assets/app-BcjkGO2v.css",
     "name": "app",
     "names": [
       "app.css"
@@ -17,17 +24,28 @@
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true
   },
+  "resources/js/Pages/AdminDashboard.vue": {
+    "file": "assets/AdminDashboard-CQmI1QoA.js",
+    "name": "AdminDashboard",
+    "src": "resources/js/Pages/AdminDashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js",
+      "_useToasts-CkvjtAD2.js"
+    ]
+  },
   "resources/js/Pages/PosTerminal.vue": {
-    "file": "assets/PosTerminal-BPVcyCDn.js",
+    "file": "assets/PosTerminal-DDRL9FEm.js",
     "name": "PosTerminal",
     "src": "resources/js/Pages/PosTerminal.vue",
     "isDynamicEntry": true,
     "imports": [
-      "resources/js/app.js"
+      "resources/js/app.js",
+      "_useToasts-CkvjtAD2.js"
     ]
   },
   "resources/js/Pages/SetupWizard.vue": {
-    "file": "assets/SetupWizard-BR6k3L1O.js",
+    "file": "assets/SetupWizard-CyMZAlos.js",
     "name": "SetupWizard",
     "src": "resources/js/Pages/SetupWizard.vue",
     "isDynamicEntry": true,
@@ -36,16 +54,17 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-BmBz3n4Y.js",
+    "file": "assets/app-BsxatYMl.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "dynamicImports": [
+      "resources/js/Pages/AdminDashboard.vue",
       "resources/js/Pages/PosTerminal.vue",
       "resources/js/Pages/SetupWizard.vue"
     ],
     "css": [
-      "assets/app-pzYGmuRM.css"
+      "assets/app-BcjkGO2v.css"
     ]
   }
 }
