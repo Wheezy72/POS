@@ -19,7 +19,7 @@ Route::get('/pos', fn () => Inertia::render('PosTerminal', [
 ]))->middleware('app.configured');
 Route::view('/dashboard', 'admin.dashboard');
 
-Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (): void {
+Route::middleware(['auth', 'role:cashier', 'ntp.sync'])->prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);
     Route::post('/checkout', [POSApiController::class, 'checkout']);
     Route::get('/system-clock-anchor', [POSApiController::class, 'systemClockAnchor']);
@@ -30,11 +30,13 @@ Route::middleware(['auth', 'role:cashier'])->prefix('api/pos')->group(function (
     Route::post('/void-sale', [POSApiController::class, 'voidSale']);
 });
 
-Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook']);
-Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin']);
+Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook'])->middleware('mpesa.whitelist');
+Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin'])
+    ->middleware('throttle:5,10');
 
 Route::prefix('api/auth')->group(function (): void {
-    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin']);
+    Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
+        ->middleware('throttle:5,10');
 });
 
 Route::middleware('auth')->group(function (): void {

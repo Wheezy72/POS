@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Services\ReceiptPrinterService;
 use App\Models\AuditLog;
 use App\Jobs\PrintReceiptToHardware;
 use App\Jobs\SyncSaleToCloud;
@@ -61,6 +62,7 @@ class POSApiController extends Controller
             'cart.*.product_id' => ['required', 'uuid'],
             'cart.*.quantity' => ['required', 'numeric'],
             'cart.*.override_unit_price' => ['nullable', 'numeric', 'gt:0'],
+            'terminal_id' => ['nullable', 'uuid'],
             'payments' => ['required', 'array', 'min:1'],
             'payments.*.method' => ['required', 'in:cash,mpesa,card,credit_deni'],
             'payments.*.amount' => ['required', 'numeric'],
@@ -81,7 +83,7 @@ class POSApiController extends Controller
         $managerOverrideApproved = $managerApprover !== null;
 
         try {
-            $sale = DB::transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
+            $sale = DB::connection()->transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
                 $creditSaleRequested = collect($validated['payments'])->contains(
                     fn (array $payment): bool => $payment['method'] === 'credit_deni'
                 );
@@ -268,6 +270,7 @@ class POSApiController extends Controller
 
                 $sale = Sale::query()->create([
                     'user_id' => $cashierId,
+                    'terminal_id' => $validated['terminal_id'] ?? null,
                     'customer_id' => $customer?->id ?? ($validated['customer_id'] ?? null),
                     'subtotal' => $subtotal,
                     'tax_total' => $taxTotal,
@@ -398,6 +401,7 @@ class POSApiController extends Controller
             'receipt_number' => $sale->receipt_number,
             'sale' => $sale,
             'pricing_adjustments' => $sale->getRelation('pricingAdjustments'),
+            'receipt_payload' => app(ReceiptPrinterService::class)->generateReceiptPayload($sale),
         ], 201);
     }
 

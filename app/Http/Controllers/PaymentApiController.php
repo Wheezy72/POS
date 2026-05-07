@@ -42,17 +42,38 @@ class PaymentApiController extends Controller
             $customerName = 'Unknown Customer';
         }
 
-        $payment = IncomingMpesaPayment::query()->firstOrCreate(
-            ['transaction_code' => $validated['TransID']],
-            [
-                'customer_name' => $customerName,
-                'phone_number' => $validated['MSISDN'] ?? '',
-                'phone_number_normalized' => \App\Models\Customer::normalizePhone($validated['MSISDN'] ?? null),
-                'amount' => round((float) $validated['TransAmount'], 2),
-                'status' => 'pending',
-                'claimed_at' => null,
-            ]
-        );
+        try {
+            $payment = \Illuminate\Support\Facades\DB::transaction(function () use ($validated, $customerName) {
+                // Check if already exists to avoid unique constraint violation before we even lock
+                $existing = IncomingMpesaPayment::query()
+                    ->where('transaction_code', $validated['TransID'])
+                    ->first();
+                
+                if ($existing) {
+                    return $existing;
+                }
+
+                return IncomingMpesaPayment::query()
+                    ->create([
+                        'transaction_code' => $validated['TransID'],
+                        'customer_name' => $customerName,
+                        'phone_number' => $validated['MSISDN'] ?? '',
+                        'phone_number_normalized' => \App\Models\Customer::normalizePhone($validated['MSISDN'] ?? null),
+                        'amount' => round((float) $validated['TransAmount'], 2),
+                        'status' => 'pending',
+                        'claimed_at' => null,
+                    ]);
+            });
+        } catch (\Exception $e) {
+            Log::error('M-Pesa Idempotency Failure', [
+                'TransID' => $validated['TransID'],
+                'error' => $e->getMessage()
+            ]);
+            return response()->json([
+                'ResultCode' => 1,
+                'ResultDesc' => 'Internal Error',
+            ], 500);
+        }
 
         Log::info('Incoming M-PESA C2B payment captured.', [
             'transaction_code' => $payment->transaction_code,
