@@ -17,7 +17,10 @@ Route::get('/pos', fn () => Inertia::render('PosTerminal', [
     'overlayHeading' => 'Unlock the register',
     'overlayLabel' => 'Staff PIN',
 ]))->middleware('app.configured');
-Route::view('/dashboard', 'admin.dashboard');
+Route::get('/dashboard', fn () => Inertia::render('AdminDashboard', [
+    'overlayHeading' => 'Unlock the admin dashboard',
+    'overlayLabel' => 'Admin PIN',
+]));
 
 Route::middleware(['auth', 'role:cashier', 'ntp.sync'])->prefix('api/pos')->group(function (): void {
     Route::post('/search', [POSApiController::class, 'search']);

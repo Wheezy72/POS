@@ -20,17 +20,15 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
-        $isCashier = $user !== null && $user->role === 'cashier';
-
         return [
             ...parent::share($request),
             'auth' => [
-                'user' => $isCashier ? [
+                'user' => $user !== null ? [
                     'id' => (string) $user->getAuthIdentifier(),
                     'name' => $user->name,
                     'role' => $user->role,
                 ] : null,
-                'blockedRole' => $user !== null && ! $isCashier ? $user->role : null,
+                'blockedRole' => $user !== null && $user->role !== 'cashier' ? $user->role : null,
             ],
             'csrfToken' => csrf_token(),
             'settings' => SystemSetting::featureFlags(),

@@ -54,6 +54,7 @@ class POSApiController extends Controller
     public function checkout(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            'client_checkout_id' => ['nullable', 'string', 'max:100'],
             'customer_id' => ['nullable', 'uuid'],
             'customer_phone' => ['nullable', 'string', 'max:32'],
             'manager_pin' => ['nullable', 'string', 'regex:/^\d{4}(\d{2})?$/'],
@@ -81,9 +82,27 @@ class POSApiController extends Controller
 
         $managerApprover = $this->resolveManagerApprover($validated['manager_pin'] ?? null);
         $managerOverrideApproved = $managerApprover !== null;
+        $clientCheckoutId = $validated['client_checkout_id'] ?? null;
+
+        if ($clientCheckoutId !== null) {
+            $existingSale = Sale::query()
+                ->where('user_id', $cashierId)
+                ->where('client_checkout_id', $clientCheckoutId)
+                ->with(['customer', 'saleItems.product.taxCategory', 'payments'])
+                ->first();
+
+            if ($existingSale !== null) {
+                return response()->json([
+                    'message' => 'Checkout already processed.',
+                    'receipt_number' => $existingSale->receipt_number,
+                    'sale' => $existingSale,
+                    'pricing_adjustments' => [],
+                ]);
+            }
+        }
 
         try {
-            $sale = DB::connection()->transaction(function () use ($validated, $cashierId, $managerOverrideApproved): Sale {
+            $sale = DB::transaction(function () use ($validated, $cashierId, $managerOverrideApproved, $clientCheckoutId): Sale {
                 $creditSaleRequested = collect($validated['payments'])->contains(
                     fn (array $payment): bool => $payment['method'] === 'credit_deni'
                 );
@@ -280,6 +299,7 @@ class POSApiController extends Controller
                     'is_suspected_duplicate' => $duplicateSignal['is_suspected_duplicate'],
                     'suspected_duplicate_reason' => $duplicateSignal['reason'],
                     'receipt_number' => $this->generateReceiptNumber(),
+                    'client_checkout_id' => $clientCheckoutId,
                 ]);
 
                 foreach ($lineItems as $lineItem) {
@@ -292,11 +312,7 @@ class POSApiController extends Controller
                         'subtotal' => $lineItem['subtotal'],
                     ]);
 
-                    if ($lineItem['quantity'] > 0) {
-                        $lineItem['product']->decrement('stock_quantity', $lineItem['quantity']);
-                    } else {
-                        $lineItem['product']->increment('stock_quantity', abs($lineItem['quantity']));
-                    }
+                    $this->applyAtomicStockMovement($lineItem['product'], $lineItem['quantity']);
                 }
 
                 $mpesaClaimAttached = false;
@@ -304,6 +320,7 @@ class POSApiController extends Controller
 
                 foreach ($normalizedPayments as $paymentData) {
                     $referenceNumber = $paymentData['reference_number'] ?? null;
+                    $incomingMpesaPaymentId = null;
 
                     if (
                         $claimedIncomingPayment !== null &&
@@ -311,11 +328,13 @@ class POSApiController extends Controller
                         $paymentData['method'] === 'mpesa'
                     ) {
                         $referenceNumber = $claimedIncomingPayment->transaction_code;
+                        $incomingMpesaPaymentId = $claimedIncomingPayment->id;
                         $mpesaClaimAttached = true;
                     }
 
                     $payment = Payment::query()->create([
                         'sale_id' => $sale->id,
+                        'incoming_mpesa_payment_id' => $incomingMpesaPaymentId,
                         'method' => $paymentData['method'],
                         'amount' => round((float) $paymentData['amount'], 2),
                         'phone_number' => $paymentData['phone_number'],
@@ -642,6 +661,32 @@ class POSApiController extends Controller
         } while (Sale::query()->where('receipt_number', $receiptNumber)->exists());
 
         return $receiptNumber;
+    }
+
+    private function applyAtomicStockMovement(Product $product, float $quantity): void
+    {
+        $quantity = round($quantity, 2);
+
+        if ($quantity > 0) {
+            $updated = Product::query()
+                ->whereKey($product->id)
+                ->where('stock_quantity', '>=', $quantity)
+                ->update([
+                    'stock_quantity' => DB::raw('stock_quantity - ' . $quantity),
+                ]);
+
+            if ($updated !== 1) {
+                throw new RuntimeException("Insufficient stock for product {$product->name}.");
+            }
+
+            return;
+        }
+
+        if ($quantity < 0) {
+            Product::query()
+                ->whereKey($product->id)
+                ->increment('stock_quantity', abs($quantity));
+        }
     }
 
     private function normalizePayments(array $payments, ?IncomingMpesaPayment $claimedIncomingPayment): array
