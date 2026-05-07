@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 
 class SystemSetting extends Model
 {
@@ -36,6 +37,10 @@ class SystemSetting extends Model
             'enable_sales_hours_lock' => false,
             'is_app_configured' => false,
         ];
+
+        if (! Schema::hasTable('system_settings')) {
+            return $defaults;
+        }
 
         $settings = static::query()
             ->whereIn('key', array_keys($defaults))

@@ -4,6 +4,7 @@ export function useScannerFocus({
     scannerInput,
     pinInput,
     searchInput,
+    paymentInput,
     showPinOverlay,
     showSearchModal,
     showPayModal,
@@ -17,7 +18,12 @@ export function useScannerFocus({
         }
 
         if (showSearchModal.value) {
-            nextTick(() => searchInput.value?.focus());
+            nextTick(() => searchInput.value?.focus?.());
+            return;
+        }
+
+        if (showPayModal.value) {
+            nextTick(() => paymentInput.value?.focus?.());
             return;
         }
 
@@ -25,7 +31,7 @@ export function useScannerFocus({
     }
 
     function focusPinInput() {
-        nextTick(() => pinInput.value?.focus());
+        nextTick(() => pinInput.value?.focus?.());
     }
 
     function focusScannerInput(force = true) {
@@ -39,12 +45,14 @@ export function useScannerFocus({
             return;
         }
 
-        if (!force && document.activeElement === element) {
+        const target = element?.$el ?? element;
+
+        if (!force && document.activeElement === target) {
             return;
         }
 
-        element.focus();
-        element.select();
+        element.focus?.();
+        element.select?.();
     }
 
     function handleVisibilityChange() {

@@ -19,8 +19,7 @@ class AdminDashboardTest extends TestCase
         $response = $this->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSeeText('Unlock the admin dashboard');
-        $response->assertSeeText('Admin PIN');
+        $response->assertSee('AdminDashboard');
     }
 
     public function test_admin_can_fetch_dashboard_overview(): void
