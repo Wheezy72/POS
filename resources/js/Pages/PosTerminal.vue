@@ -3,226 +3,61 @@
 
     <div class="min-h-screen bg-slate-100 text-slate-900">
         <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-4 px-4 py-4">
-            <header class="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)_14rem]">
-                <section class="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Clock</p>
-                    <p class="mt-2 text-3xl font-black tracking-[0.08em] text-emerald-600">{{ clock }}</p>
-                </section>
-
-                <section class="rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-                    <div class="flex items-start justify-between gap-4">
-                        <div>
-                            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Transaction</p>
-                            <p class="mt-1 font-mono text-lg font-bold text-slate-900">{{ transactionId }}</p>
-                        </div>
-                        <div class="text-right text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                            <p>Operator</p>
-                            <p class="mt-1 font-semibold text-slate-900">{{ currentUser ? currentUser.name : 'Register locked' }}</p>
-                        </div>
-                    </div>
-
-                    <label class="mt-4 block text-[11px] font-bold uppercase tracking-[0.25em] text-slate-500">
-                        Barcode or SKU
-                    </label>
-                    <input
-                        ref="scannerInput"
-                        v-model.trim="barcode"
-                        type="text"
-                        autocomplete="off"
-                        class="mt-2 h-16 w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 text-2xl font-black tracking-wide text-slate-950 outline-none ring-0 placeholder:font-semibold placeholder:text-slate-400 focus:border-sky-500 focus:bg-white"
-                        placeholder="Scan barcode or type SKU"
-                        @keydown.enter.prevent="searchProducts()"
-                    >
-                </section>
-
-                <section class="rounded-3xl border border-slate-200 bg-white px-5 py-4 text-right shadow-sm">
-                    <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500">Session</p>
-                    <p class="mt-2 text-sm font-bold uppercase tracking-[0.18em]" :class="currentUser ? 'text-emerald-600' : 'text-red-600'">
-                        {{ currentUser ? currentUser.role : 'Locked' }}
-                    </p>
-                    <p class="mt-4 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                        {{ searchResults.length }} results ready
-                    </p>
-                </section>
-            </header>
+            <TerminalHeader
+                ref="scannerInput"
+                v-model:barcode="barcode"
+                :clock="clock"
+                :current-user="currentUser"
+                :result-count="searchResults.length"
+                :transaction-id="transactionId"
+                @search="searchProducts()"
+            />
 
             <main class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_13rem]">
                 <section class="grid min-h-0 gap-3">
-                    <section class="min-h-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                            <div>
-                                <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Cart</p>
-                            </div>
-                            <div class="text-right text-xs uppercase tracking-[0.18em] text-slate-500">
-                                <p>{{ totalUnits.toFixed(2) }} units</p>
-                                <p>{{ cart.length }} lines</p>
-                            </div>
-                        </div>
-
-                        <div class="overflow-auto">
-                            <table class="min-w-full border-collapse text-sm">
-                                <thead class="bg-slate-50 text-[11px] uppercase tracking-[0.18em] text-slate-500">
-                                    <tr>
-                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-left">#</th>
-                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-left">Item</th>
-                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-right">Price</th>
-                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-center">Qty</th>
-                                        <th class="border-b border-r border-slate-200 px-2 py-2 text-right">Disc</th>
-                                        <th class="border-b border-slate-200 px-2 py-2 text-right">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-if="cart.length === 0">
-                                        <td colspan="6" class="px-3 py-12 text-center text-sm text-slate-500">
-                                            Cart is empty.
-                                        </td>
-                                    </tr>
-                                    <tr v-for="(item, index) in cart" :key="item.product_id" class="odd:bg-white even:bg-slate-50/70">
-                                        <td class="border-b border-r border-slate-200 px-2 py-2 font-mono text-slate-500">{{ index + 1 }}</td>
-                                        <td class="border-b border-r border-slate-200 px-2 py-2">
-                                            <p class="font-semibold text-slate-900">{{ item.name }}</p>
-                                            <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ item.sku || 'Manual item' }}</p>
-                                        </td>
-                                        <td class="border-b border-r border-slate-200 px-2 py-2 text-right font-semibold">
-                                            {{ formatCurrency(effectiveUnitPrice(item)) }}
-                                        </td>
-                                        <td class="border-b border-r border-slate-200 px-2 py-2">
-                                            <div class="flex items-center justify-center gap-1">
-                                                <button class="h-8 w-8 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-100" @click="changeQty(item, -1)">-</button>
-                                                <input
-                                                    v-model.number="item.quantity"
-                                                    type="number"
-                                                    min="0.25"
-                                                    step="0.25"
-                                                    class="h-8 w-16 rounded-xl border border-slate-300 bg-slate-50 px-1 text-center font-semibold outline-none"
-                                                    @change="normalizeQuantity(item)"
-                                                >
-                                                <button class="h-8 w-8 rounded-xl border border-slate-300 bg-white font-bold hover:bg-slate-100" @click="changeQty(item, 1)">+</button>
-                                            </div>
-                                        </td>
-                                        <td class="border-b border-r border-slate-200 px-2 py-2">
-                                            <input
-                                                v-model.number="item.discount"
-                                                type="number"
-                                                min="0"
-                                                step="0.01"
-                                                class="h-8 w-full rounded-xl border border-slate-300 bg-slate-50 px-2 text-right outline-none"
-                                                @change="normalizeDiscount(item)"
-                                            >
-                                        </td>
-                                        <td class="border-b border-slate-200 px-2 py-2 text-right">
-                                            <div class="flex items-center justify-end gap-2">
-                                                <span class="font-bold text-slate-900">{{ formatCurrency(lineTotal(item)) }}</span>
-                                                <button class="rounded-xl border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-red-600 hover:bg-red-100" @click="removeItem(item.product_id)">
-                                                    Del
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </section>
+                    <CartTable
+                        :cart="cart"
+                        :effective-unit-price="effectiveUnitPrice"
+                        :format-currency="formatCurrency"
+                        :line-total="lineTotal"
+                        :total-units="totalUnits"
+                        @change-quantity="changeQty"
+                        @normalize-discount="normalizeDiscount"
+                        @normalize-quantity="normalizeQuantity"
+                        @remove-item="removeItem"
+                    />
 
                     <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                        <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                                <div>
-                                    <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Search results</p>
-                                </div>
-                                <button class="rounded-xl border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-700 hover:bg-sky-100" @click="openSearchModal()">
-                                    [F2] Search
-                                </button>
-                            </div>
+                        <ProductSearchPanel
+                            :format-currency="formatCurrency"
+                            :search-busy="searchBusy"
+                            :search-results="searchResults"
+                            @open-search="openSearchModal"
+                            @select-product="addProductToCart"
+                        />
 
-                            <div class="max-h-56 overflow-auto">
-                                <div v-if="searchBusy" class="px-4 py-6 text-sm text-slate-500">Searching…</div>
-                                <div v-else-if="searchResults.length === 0" class="px-3 py-6 text-sm text-slate-500">
-                                    Start typing to search products.
-                                </div>
-                                <button
-                                    v-for="product in searchResults"
-                                    :key="product.id"
-                                    class="grid w-full grid-cols-[1fr_auto_auto] gap-3 border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
-                                    @click="addProductToCart(product)"
-                                >
-                                    <div class="min-w-0">
-                                        <p class="truncate font-semibold text-slate-900">{{ product.name }}</p>
-                                        <p class="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ product.sku }}</p>
-                                    </div>
-                                    <p class="text-right text-sm font-bold text-slate-900">{{ formatCurrency(Number(product.base_price)) }}</p>
-                                    <p class="text-right text-[11px] uppercase tracking-[0.16em]" :class="Number(product.stock_quantity) < 10 ? 'text-red-600' : 'text-slate-500'">
-                                        {{ Number(product.stock_quantity).toFixed(2) }}
-                                    </p>
-                                </button>
-                            </div>
-                        </section>
-
-                        <section class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                                <div>
-                                    <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">M-PESA live feed</p>
-                                </div>
-                                <button class="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700 hover:bg-emerald-100" @click="fetchLivePayments()">
-                                    Refresh
-                                </button>
-                            </div>
-                            <div class="max-h-56 overflow-auto">
-                                <div v-if="liveFeedBusy" class="px-4 py-6 text-sm text-slate-500">Loading live feed…</div>
-                                <div v-else-if="livePayments.length === 0" class="px-4 py-6 text-sm text-slate-500">No pending M-PESA deposits.</div>
-                                <button
-                                    v-for="payment in livePayments"
-                                    :key="payment.id"
-                                    class="w-full border-b border-slate-200 px-4 py-3 text-left hover:bg-slate-50"
-                                    :class="selectedLivePayment?.id === payment.id ? 'bg-emerald-50' : ''"
-                                    @click="selectLivePayment(payment)"
-                                >
-                                    <div class="flex items-center justify-between gap-3">
-                                        <div class="min-w-0">
-                                            <p class="truncate font-semibold text-slate-900">{{ payment.customer_name }}</p>
-                                            <p class="truncate text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ payment.transaction_code }}</p>
-                                        </div>
-                                        <div class="text-right">
-                                            <p class="font-bold text-emerald-600">{{ formatCurrency(Number(payment.amount)) }}</p>
-                                            <p class="text-[11px] text-slate-500">{{ shortTimestamp(payment.created_at) }}</p>
-                                        </div>
-                                    </div>
-                                </button>
-                            </div>
-                        </section>
+                        <MpesaLiveFeed
+                            :format-currency="formatCurrency"
+                            :live-feed-busy="liveFeedBusy"
+                            :live-payments="livePayments"
+                            :selected-live-payment="selectedLivePayment"
+                            :short-timestamp="shortTimestamp"
+                            @refresh="fetchLivePayments"
+                            @select-payment="selectLivePayment"
+                        />
                     </section>
                 </section>
 
-                <aside class="grid gap-3">
-                    <button class="rounded-3xl border border-yellow-300 bg-yellow-300 px-4 py-4 text-left text-slate-950 shadow-sm hover:bg-yellow-200" @click="newSale()">
-                        <p class="text-lg font-black">[F1] New</p>
-                    </button>
-                    <button class="rounded-3xl border border-sky-600 bg-sky-600 px-4 py-4 text-left text-white shadow-sm hover:bg-sky-500" @click="openSearchModal()">
-                        <p class="text-lg font-black">[F2] Search</p>
-                    </button>
-                    <button class="rounded-3xl border border-emerald-600 bg-emerald-600 px-4 py-4 text-left text-white shadow-sm hover:bg-emerald-500" @click="openPayModal()">
-                        <p class="text-lg font-black">[F4] Pay</p>
-                    </button>
-                    <button class="rounded-3xl border border-red-600 bg-red-600 px-4 py-4 text-left text-white shadow-sm hover:bg-red-500" @click="logout()">
-                        <p class="text-lg font-black">[F10] Logout</p>
-                    </button>
-
-                    <section class="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Selected payment</p>
-                        <div v-if="selectedLivePayment" class="mt-2">
-                            <p class="font-semibold text-slate-900">{{ selectedLivePayment.customer_name }}</p>
-                            <p class="text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ selectedLivePayment.transaction_code }}</p>
-                            <p class="mt-1 font-bold text-emerald-600">{{ formatCurrency(Number(selectedLivePayment.amount)) }}</p>
-                        </div>
-                        <p v-else class="mt-2 text-sm text-slate-500">Nothing selected.</p>
-                    </section>
-
-                    <section class="rounded-3xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                        <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Pending STK</p>
-                        <p class="mt-2 font-mono text-sm text-amber-600">{{ stkCheckoutRequestId || 'None' }}</p>
-                        <p class="mt-2 text-xs text-slate-500">{{ stkStatusMessage }}</p>
-                    </section>
-                </aside>
+                <PosActionRail
+                    :format-currency="formatCurrency"
+                    :selected-live-payment="selectedLivePayment"
+                    :stk-checkout-request-id="stkCheckoutRequestId"
+                    :stk-status-message="stkStatusMessage"
+                    @logout="logout"
+                    @new-sale="newSale"
+                    @open-pay="openPayModal"
+                    @open-search="openSearchModal"
+                />
             </main>
 
             <footer class="ml-auto w-full max-w-[28rem] rounded-3xl border border-slate-200 bg-white text-slate-950 shadow-sm">
@@ -237,17 +72,7 @@
             </footer>
         </div>
 
-        <div class="fixed right-3 top-3 z-50 flex w-full max-w-sm flex-col gap-2">
-            <div
-                v-for="toast in toasts"
-                :key="toast.id"
-                class="border px-3 py-2 shadow-lg"
-                :class="toast.variant === 'error' ? 'border-red-200 bg-white text-red-700' : toast.variant === 'success' ? 'border-emerald-200 bg-white text-emerald-700' : 'border-slate-200 bg-white text-slate-900'"
-            >
-                <p class="font-bold uppercase tracking-[0.18em]">{{ toast.title }}</p>
-                <p class="mt-1 text-sm">{{ toast.message }}</p>
-            </div>
-        </div>
+        <ToastStack :toasts="toasts" />
 
         <div v-if="showSearchModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm">
             <div class="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
@@ -419,6 +244,21 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
+import CartTable from '../Components/Pos/CartTable.vue';
+import MpesaLiveFeed from '../Components/Pos/MpesaLiveFeed.vue';
+import PosActionRail from '../Components/Pos/PosActionRail.vue';
+import ProductSearchPanel from '../Components/Pos/ProductSearchPanel.vue';
+import TerminalHeader from '../Components/Pos/TerminalHeader.vue';
+import ToastStack from '../Components/Pos/ToastStack.vue';
+import { formatCurrency, roundCurrency, shortTimestamp } from '../utils/formatters';
+import { useAudioFeedback } from '../composables/pos/useAudioFeedback';
+import { useCart } from '../composables/pos/useCart';
+import { usePosApi } from '../composables/pos/usePosApi';
+import { useProductSearch } from '../composables/pos/useProductSearch';
+import { useScannerFocus } from '../composables/pos/useScannerFocus';
+import { useStkPolling } from '../composables/pos/useStkPolling';
+import { useTerminalKeyboard } from '../composables/pos/useTerminalKeyboard';
+import { useToasts } from '../composables/pos/useToasts';
 
 const props = defineProps({
     overlayHeading: {
@@ -444,8 +284,6 @@ const blockedRole = computed(() => page.props.auth?.blockedRole ?? null);
 const clock = ref('');
 const barcode = ref('');
 const searchQuery = ref('');
-const cart = ref([]);
-const searchResults = ref([]);
 const livePayments = ref([]);
 const selectedLivePayment = ref(null);
 const showSearchModal = ref(false);
@@ -457,27 +295,39 @@ const managerPin = ref('');
 const customerPhone = ref('');
 const cashReceived = ref(0);
 const stkPhone = ref('2547');
-const stkCheckoutRequestId = ref('');
-const stkStatusMessage = ref('Idle');
-const searchBusy = ref(false);
 const checkoutBusy = ref(false);
 const pinBusy = ref(false);
 const liveFeedBusy = ref(false);
-const toasts = ref([]);
 const transactionId = ref(generateTransactionId());
 
 let clockTimer = null;
-let focusTimer = null;
 let liveFeedTimer = null;
-let stkPollTimer = null;
-let audioContext = null;
-let searchDebounceTimer = null;
-let searchRequestSequence = 0;
 
-const subtotal = computed(() => cart.value.reduce((sum, item) => sum + lineSubtotal(item), 0));
-const tax = computed(() => cart.value.reduce((sum, item) => sum + lineTax(item), 0));
-const grandTotal = computed(() => roundCurrency(subtotal.value + tax.value));
-const totalUnits = computed(() => cart.value.reduce((sum, item) => sum + Number(item.quantity || 0), 0));
+const posApi = usePosApi();
+const { playSuccessBeep, playErrorBuzz } = useAudioFeedback();
+const { toasts, toast } = useToasts({ onError: playErrorBuzz });
+const {
+    cart,
+    subtotal,
+    tax,
+    grandTotal,
+    totalUnits,
+    addProductToCart: addProductToCartWithoutFeedback,
+    removeItem,
+    changeQty,
+    normalizeQuantity,
+    normalizeDiscount,
+    effectiveUnitPrice,
+    lineTotal,
+    resetCart,
+} = useCart();
+const {
+    stkCheckoutRequestId,
+    stkStatusMessage,
+    startStkPolling,
+    stopStkPolling,
+    resetStkStatus,
+} = useStkPolling(posApi, toast);
 const creditSalesEnabled = computed(() => Boolean(settings.value.enable_credit_sales));
 const cashChange = computed(() => roundCurrency(Number(cashReceived.value || 0) - grandTotal.value));
 const cashPresets = computed(() => {
@@ -489,6 +339,46 @@ const cashPresets = computed(() => {
         Math.ceil(total / 100) * 100,
         Math.ceil(total / 200) * 200,
     ])).filter((value) => value > 0);
+});
+
+const {
+    focusPriorityInput,
+    focusPinInput,
+    focusScannerInput,
+} = useScannerFocus({
+    scannerInput,
+    pinInput,
+    searchInput,
+    showPinOverlay,
+    showSearchModal,
+    showPayModal,
+});
+
+const {
+    searchResults,
+    searchBusy,
+    queueProductSearch,
+    searchProducts,
+    stopProductSearch,
+    resetProductSearch,
+} = useProductSearch(posApi, {
+    addProduct: addProductToCart,
+    focusScannerInput,
+    toast,
+    showSearchModal,
+    barcode,
+    searchQuery,
+});
+
+useTerminalKeyboard({
+    closeModals,
+    newSale,
+    openSearchModal,
+    openPayModal,
+    logout,
+    focusScannerInput,
+    creditSalesEnabled,
+    paymentTab,
 });
 
 watch([showSearchModal, showPayModal, showPinOverlay], async () => {
@@ -523,16 +413,12 @@ watch(barcode, (value) => {
 onMounted(() => {
     updateClock();
     clockTimer = window.setInterval(updateClock, 1000);
-    focusTimer = window.setInterval(() => focusScannerInput(false), 800);
     liveFeedTimer = window.setInterval(() => {
         if (currentUser.value && !showPinOverlay.value) {
             fetchLivePayments();
         }
     }, 15000);
 
-    window.addEventListener('keydown', handleGlobalKeydown);
-    window.addEventListener('focus', focusPriorityInput);
-    window.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('pos:unauthenticated', handleUnauthenticated);
 
     if (currentUser.value) {
@@ -547,73 +433,15 @@ onBeforeUnmount(() => {
         window.clearInterval(clockTimer);
     }
 
-    if (focusTimer) {
-        window.clearInterval(focusTimer);
-    }
-
     if (liveFeedTimer) {
         window.clearInterval(liveFeedTimer);
     }
 
-    if (searchDebounceTimer) {
-        window.clearTimeout(searchDebounceTimer);
-    }
-
+    stopProductSearch();
     stopStkPolling();
 
-    window.removeEventListener('keydown', handleGlobalKeydown);
-    window.removeEventListener('focus', focusPriorityInput);
-    window.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('pos:unauthenticated', handleUnauthenticated);
 });
-
-function handleVisibilityChange() {
-    if (!document.hidden) {
-        focusPriorityInput();
-    }
-}
-
-function handleGlobalKeydown(event) {
-    if (event.key === 'Escape') {
-        event.preventDefault();
-        closeModals();
-        return;
-    }
-
-    switch (event.key) {
-        case 'F1':
-            event.preventDefault();
-            newSale();
-            break;
-        case 'F2':
-            event.preventDefault();
-            openSearchModal();
-            break;
-        case 'F4':
-            event.preventDefault();
-            openPayModal();
-            break;
-        case 'F7':
-            if (!creditSalesEnabled.value) {
-                break;
-            }
-
-            event.preventDefault();
-            openPayModal();
-            paymentTab.value = 'credit';
-            break;
-        case 'F8':
-            event.preventDefault();
-            focusScannerInput(true);
-            break;
-        case 'F10':
-            event.preventDefault();
-            logout();
-            break;
-        default:
-            break;
-    }
-}
 
 function updateClock() {
     clock.value = new Intl.DateTimeFormat('en-KE', {
@@ -646,43 +474,6 @@ function closeModals() {
     focusPriorityInput();
 }
 
-function focusPriorityInput() {
-    if (showPinOverlay.value) {
-        focusPinInput();
-        return;
-    }
-
-    if (showSearchModal.value) {
-        nextTick(() => searchInput.value?.focus());
-        return;
-    }
-
-    focusScannerInput(true);
-}
-
-function focusPinInput() {
-    nextTick(() => pinInput.value?.focus());
-}
-
-function focusScannerInput(force = true) {
-    if (showPinOverlay.value || showSearchModal.value || showPayModal.value) {
-        return;
-    }
-
-    const element = scannerInput.value;
-
-    if (!element) {
-        return;
-    }
-
-    if (!force && document.activeElement === element) {
-        return;
-    }
-
-    element.focus();
-    element.select();
-}
-
 async function loginWithPin() {
     if (!pin.value) {
         toast('PIN required', 'Enter a staff PIN to unlock the register.', 'error');
@@ -692,9 +483,7 @@ async function loginWithPin() {
     pinBusy.value = true;
 
     try {
-        const response = await window.axios.post('/api/login-pin', {
-            pin: pin.value,
-        });
+        const response = await posApi.loginWithPin(pin.value);
 
         currentUser.value = response.data.user;
         updateCsrfToken(response.data.csrf_token);
@@ -717,7 +506,7 @@ async function logout() {
 
     try {
         if (currentUser.value) {
-            await window.axios.post('/api/logout');
+            await posApi.logout();
         }
     } catch (error) {
         // Keep the terminal lock-first even if logout request fails.
@@ -742,147 +531,13 @@ function handleUnauthenticated() {
     focusPinInput();
 }
 
-function queueProductSearch(query, options = {}) {
-    if (searchDebounceTimer) {
-        window.clearTimeout(searchDebounceTimer);
-    }
-
-    const term = String(query ?? '').trim();
-
-    if (term.length < 2) {
-        searchRequestSequence += 1;
-        searchBusy.value = false;
-        searchResults.value = [];
-        return;
-    }
-
-    searchDebounceTimer = window.setTimeout(() => {
-        searchProducts(term, options);
-    }, 220);
-}
-
-async function searchProducts(query = barcode.value, options = {}) {
-    const term = String(query ?? '').trim();
-    const {
-        autoSelectExact = true,
-        notifyOnEmpty = true,
-        openModalOnResults = true,
-    } = options;
-
-    if (!term) {
-        searchResults.value = [];
-        focusScannerInput(true);
-        return;
-    }
-
-    const requestId = ++searchRequestSequence;
-    searchBusy.value = true;
-
-    try {
-        const response = await window.axios.post('/api/pos/search', {
-            query: term,
-        });
-
-        if (requestId !== searchRequestSequence) {
-            return;
-        }
-
-        searchResults.value = response.data;
-        searchQuery.value = term;
-
-        const exactMatch = response.data.find((product) => product.barcode === term || product.sku === term);
-
-        if (autoSelectExact && exactMatch) {
-            addProductToCart(exactMatch);
-            barcode.value = '';
-            searchResults.value = [];
-            showSearchModal.value = false;
-            focusScannerInput(true);
-            return;
-        }
-
-        if (openModalOnResults && response.data.length > 0) {
-            showSearchModal.value = true;
-        } else if (notifyOnEmpty && response.data.length === 0) {
-            toast('No match', `No product matched "${term}".`, 'info');
-        }
-    } catch (error) {
-        if (requestId === searchRequestSequence) {
-            toast('Search failed', error?.response?.data?.message ?? 'Unable to search products.', 'error');
-        }
-    } finally {
-        if (requestId === searchRequestSequence) {
-            searchBusy.value = false;
-        }
-    }
-}
-
 function addProductToCart(product) {
-    const existingItem = cart.value.find((item) => item.product_id === product.id);
-
-    if (existingItem) {
-        existingItem.quantity = roundQuantity(existingItem.quantity + 1, existingItem.allow_fractional_sales);
-    } else {
-        cart.value.push({
-            product_id: product.id,
-            name: product.name,
-            sku: product.sku,
-            quantity: 1,
-            base_price: Number(product.base_price),
-            discount: 0,
-            tax_rate: Number(product.tax_category?.rate ?? 0),
-            allow_fractional_sales: Boolean(product.allow_fractional_sales),
-        });
-    }
+    addProductToCartWithoutFeedback(product);
 
     toast('Item added', `${product.name} added to the cart.`, 'success');
     playSuccessBeep();
     barcode.value = '';
     focusScannerInput(true);
-}
-
-function removeItem(productId) {
-    cart.value = cart.value.filter((item) => item.product_id !== productId);
-}
-
-function changeQty(item, delta) {
-    const step = item.allow_fractional_sales ? 0.25 : 1;
-    item.quantity = roundQuantity(Number(item.quantity || 0) + (step * delta), item.allow_fractional_sales);
-
-    if (item.quantity <= 0) {
-        removeItem(item.product_id);
-    }
-}
-
-function normalizeQuantity(item) {
-    item.quantity = roundQuantity(item.quantity, item.allow_fractional_sales);
-
-    if (item.quantity <= 0) {
-        removeItem(item.product_id);
-    }
-}
-
-function normalizeDiscount(item) {
-    const nextDiscount = Math.max(0, Number(item.discount || 0));
-    item.discount = Math.min(roundCurrency(nextDiscount), roundCurrency(item.base_price - 0.01));
-}
-
-function effectiveUnitPrice(item) {
-    const candidate = Number(item.base_price) - Number(item.discount || 0);
-
-    return roundCurrency(Math.max(candidate, 0.01));
-}
-
-function lineSubtotal(item) {
-    return roundCurrency(Number(item.quantity || 0) * effectiveUnitPrice(item));
-}
-
-function lineTax(item) {
-    return roundCurrency(lineSubtotal(item) * (Number(item.tax_rate || 0) / 100));
-}
-
-function lineTotal(item) {
-    return roundCurrency(lineSubtotal(item) + lineTax(item));
 }
 
 async function fetchLivePayments() {
@@ -893,7 +548,7 @@ async function fetchLivePayments() {
     liveFeedBusy.value = true;
 
     try {
-        const response = await window.axios.get('/api/pos/mpesa/live-feed');
+        const response = await posApi.fetchLivePayments();
         livePayments.value = response.data.incoming_payments ?? [];
 
         if (selectedLivePayment.value) {
@@ -939,7 +594,7 @@ async function submitStkCheckout() {
     stkStatusMessage.value = 'Initiating STK push…';
 
     try {
-        const stkResponse = await window.axios.post('/api/pos/mpesa/stk-push', {
+        const stkResponse = await posApi.startStkPush({
             phone: stkPhone.value,
             amount: grandTotal.value,
             reference: transactionId.value,
@@ -1019,7 +674,7 @@ async function finalizeCheckout(payload, resetAfterSuccess = true) {
     checkoutBusy.value = true;
 
     try {
-        const response = await window.axios.post('/api/pos/checkout', {
+        const response = await posApi.checkout({
             customer_phone: customerPhone.value || null,
             manager_pin: managerPin.value || null,
             cart: cart.value.map((item) => ({
@@ -1064,71 +719,17 @@ async function finalizeCheckout(payload, resetAfterSuccess = true) {
     }
 }
 
-function startStkPolling(receiptNumber, checkoutRequestId) {
-    stopStkPolling();
-
-    let attempts = 0;
-    stkStatusMessage.value = 'Polling STK status…';
-
-    stkPollTimer = window.setInterval(async () => {
-        attempts += 1;
-
-        try {
-            const statusResponse = await window.axios.post('/api/pos/mpesa/stk-status', {
-                checkout_request_id: checkoutRequestId,
-            });
-
-            const status = statusResponse.data.status ?? {};
-            const isSuccess = status.ResultCode === 0
-                || status.ResultCode === '0'
-                || status.ResponseCode === '0'
-                || String(status.ResultDesc ?? '').toLowerCase().includes('success');
-
-            if (isSuccess) {
-                await window.axios.post('/api/pos/mpesa-verify', {
-                    CheckoutRequestID: checkoutRequestId,
-                });
-
-                stkStatusMessage.value = `STK confirmed for ${receiptNumber}.`;
-                toast('M-PESA confirmed', `Sale ${receiptNumber} has been marked paid.`, 'success');
-                stopStkPolling();
-                return;
-            }
-
-            stkStatusMessage.value = status.ResultDesc || status.CustomerMessage || 'Awaiting customer confirmation on handset…';
-
-            if (attempts >= 24) {
-                stkStatusMessage.value = 'Polling timed out. Use the verify endpoint later if payment completes.';
-                stopStkPolling();
-            }
-        } catch (error) {
-            stkStatusMessage.value = error?.response?.data?.message ?? 'Unable to poll STK status.';
-
-            if (attempts >= 24) {
-                stopStkPolling();
-            }
-        }
-    }, 5000);
-}
-
-function stopStkPolling() {
-    if (stkPollTimer) {
-        window.clearInterval(stkPollTimer);
-        stkPollTimer = null;
-    }
-}
-
 function newSale(showMessage = true) {
     stopStkPolling();
-    cart.value = [];
+    resetCart();
     barcode.value = '';
     searchQuery.value = '';
+    resetProductSearch();
     cashReceived.value = 0;
     managerPin.value = '';
     customerPhone.value = '';
     selectedLivePayment.value = null;
-    stkCheckoutRequestId.value = '';
-    stkStatusMessage.value = 'Idle';
+    resetStkStatus();
     transactionId.value = generateTransactionId();
     showSearchModal.value = false;
     showPayModal.value = false;
@@ -1154,96 +755,9 @@ function updateCsrfToken(token) {
     window.axios.defaults.headers.common['X-CSRF-TOKEN'] = token;
 }
 
-function toast(title, message, variant = 'info') {
-    const id = `${Date.now()}-${Math.random()}`;
-    toasts.value.push({ id, title, message, variant });
-
-    if (variant === 'error') {
-        playErrorBuzz();
-    }
-
-    window.setTimeout(() => {
-        toasts.value = toasts.value.filter((toastItem) => toastItem.id !== id);
-    }, 4200);
-}
-
 function generateTransactionId() {
     const now = new Date();
 
     return `TX-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-}
-
-function roundCurrency(value) {
-    return Math.round(Number(value || 0) * 100) / 100;
-}
-
-function roundQuantity(value, fractionalAllowed) {
-    const numericValue = Number(value || 0);
-
-    if (fractionalAllowed) {
-        return Math.max(0.25, Math.round(numericValue * 4) / 4);
-    }
-
-    return Math.max(1, Math.round(numericValue));
-}
-
-function formatCurrency(value) {
-    return new Intl.NumberFormat('en-KE', {
-        style: 'currency',
-        currency: 'KES',
-        minimumFractionDigits: 2,
-    }).format(Number(value || 0));
-}
-
-function shortTimestamp(value) {
-    if (!value) {
-        return '--';
-    }
-
-    return new Intl.DateTimeFormat('en-KE', {
-        hour: '2-digit',
-        minute: '2-digit',
-        day: '2-digit',
-        month: 'short',
-    }).format(new Date(value));
-}
-
-function playSuccessBeep() {
-    playTone(1240, 0.08, 'triangle', 0.045);
-}
-
-function playErrorBuzz() {
-    playTone(180, 0.18, 'sawtooth', 0.06);
-}
-
-function playTone(frequency, durationSeconds, type, volume) {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-
-    if (!AudioContextClass) {
-        return;
-    }
-
-    if (!audioContext) {
-        audioContext = new AudioContextClass();
-    }
-
-    if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => {});
-    }
-
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    const startAt = audioContext.currentTime;
-    const stopAt = startAt + durationSeconds;
-
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, startAt);
-    gainNode.gain.setValueAtTime(volume, startAt);
-    gainNode.gain.exponentialRampToValueAtTime(0.0001, stopAt);
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.start(startAt);
-    oscillator.stop(stopAt);
 }
 </script>
