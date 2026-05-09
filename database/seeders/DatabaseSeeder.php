@@ -202,6 +202,10 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Bic Shavers 5 Pack', 'sku' => 'BIC-SHAVERS-5', 'barcode' => '6161100100063', 'tax' => 'standard', 'base_price' => 148.00, 'cost_price' => 101.00, 'stock_quantity' => 18, 'allow_fractional_sales' => false, 'last_received_date' => $now->copy()->subDays(8), 'batch_expiry_date' => null],
         ];
 
+        foreach ($this->additionalMinimartProducts($now, 202 - count($catalog)) as $product) {
+            $catalog[] = $product;
+        }
+
         $categoryAssignments = [
             'KABRAS-2KG' => 'staples-flours',
             'AJAB-2KG' => 'staples-flours',
@@ -266,7 +270,7 @@ class DatabaseSeeder extends Seeder
                 'name' => $product['name'],
                 'sku' => $product['sku'],
                 'barcode' => $product['barcode'],
-                'category_id' => $categories[$categoryAssignments[$product['sku']] ?? 'household']->id,
+                'category_id' => $categories[$product['category'] ?? $categoryAssignments[$product['sku']] ?? 'household']->id,
                 'tax_category_id' => $taxCategories[$product['tax']]->id,
                 'base_price' => $product['base_price'],
                 'cost_price' => $product['cost_price'],
@@ -280,6 +284,73 @@ class DatabaseSeeder extends Seeder
 
             return [$product['sku'] => $record->load('taxCategory')];
         });
+    }
+
+    private function additionalMinimartProducts(Carbon $now, int $needed): array
+    {
+        if ($needed <= 0) {
+            return [];
+        }
+
+        $groups = [
+            ['category' => 'staples-flours', 'tax' => 'zero', 'items' => [
+                ['Hostess Maize Flour 2kg', 174, 142], ['Exe Wheat Flour 2kg', 252, 211], ['Soko Maize Meal 2kg', 169, 137], ['Famila Porridge 1kg', 195, 146], ['Blue Triangle Flour 2kg', 181, 148], ['Pearl Rice 1kg', 188, 143], ['Cil Basmati Rice 1kg', 245, 191], ['Green Grams 1kg', 226, 174], ['Rosecoco Beans 1kg', 215, 166], ['Ndengu Split 500g', 118, 86], ['Popcorn Kernels 500g', 96, 68], ['Njahe Black Beans 1kg', 238, 181], ['Millet Flour 1kg', 142, 104], ['Sorghum Flour 1kg', 136, 99], ['Atta Mark 1 Flour 2kg', 259, 211], ['Tropikal Rice 2kg', 374, 303], ['Butterfly Rice 1kg', 172, 129], ['Brown Chapati Flour 2kg', 268, 214], ['Loose Rice Pishori 1kg', 196, 151], ['Loose Beans 1kg', 205, 154], ['Green Peas 500g', 132, 96], ['Kamande Lentils 500g', 148, 109], ['Oats 500g', 185, 139], ['Corn Starch 400g', 92, 63], ['Breadcrumbs 500g', 118, 82], ['Spaghetti 500g', 126, 91], ['Pasta Shells 500g', 124, 89], ['Macaroni 500g', 122, 87], ['Lasagna Sheets 250g', 238, 181], ['Semolina 1kg', 174, 132],
+            ]],
+            ['category' => 'dairy-chilled', 'tax' => 'standard', 'items' => [
+                ['Tuzo Long Life Milk 500ml', 76, 63], ['Tuzo Fresh Milk 1L', 130, 109], ['Ilara Yoghurt Vanilla 500ml', 128, 98], ['Bio Yoghurt Natural 450ml', 156, 121], ['KCC Butter 250g', 365, 302], ['KCC Cheese Slices 200g', 298, 241], ['Brookside Fresh Milk 500ml', 72, 59], ['Daima Mala 500ml', 82, 68], ['Molo Milk 500ml', 74, 61], ['Lato Milk 500ml', 70, 56], ['Tuzo Mala 500ml', 84, 69], ['Delamere Yoghurt 450ml', 175, 137], ['Ilara Fresh Milk 500ml', 68, 55], ['KCC Ghee 500g', 690, 581], ['Brookside Butter 250g', 378, 315], ['Yoghurt Cup Strawberry 150ml', 55, 38], ['Yoghurt Cup Vanilla 150ml', 55, 38], ['Cream Cheese 250g', 420, 342],
+            ]],
+            ['category' => 'beverages', 'tax' => 'standard', 'items' => [
+                ['Pepsi 500ml', 70, 48], ['Mountain Dew 500ml', 70, 48], ['Novida 500ml', 75, 51], ['Stoney Tangawizi 500ml', 75, 52], ['Dasani Water 1L', 65, 42], ['Aquamist Water 500ml', 35, 20], ['Highlands Water 1.5L', 72, 45], ['Afia Mango 1L', 155, 113], ['Afia Mixed Fruit 1L', 155, 113], ['Ribena Blackcurrant 1L', 365, 292], ['Quencher Juice 1L', 148, 106], ['Red Bull 250ml', 275, 222], ['Predator Energy 400ml', 95, 68], ['Monster Energy 500ml', 285, 226], ['Ketepa Tea Leaves 250g', 165, 125], ['Kericho Gold Tea 100s', 245, 191], ['Dormans Coffee 250g', 525, 421], ['Fahari Ya Kenya Tea 500g', 265, 204], ['Cadbury Drinking Chocolate 500g', 495, 393], ['Milo 400g', 568, 462], ['Tang Orange 125g', 88, 62], ['Ribena 250ml', 95, 68], ['Minute Maid Tropical 400ml', 82, 58], ['Del Monte Pineapple 1L', 235, 181], ['Pick N Peel Mango 1L', 178, 132], ['Kenylon Lemonade 2L', 145, 97], ['Coke 2L', 215, 159], ['Fanta 2L', 215, 159], ['Sprite 2L', 215, 159],
+            ]],
+            ['category' => 'cooking-essentials', 'tax' => 'standard', 'items' => [
+                ['Elianto Sunflower Oil 1L', 365, 304], ['Elianto Sunflower Oil 2L', 715, 612], ['Fresh Fri 1L', 342, 286], ['Rina Vegetable Oil 1L', 335, 278], ['Rina Vegetable Oil 2L', 655, 558], ['Chipsy Cooking Oil 1L', 318, 259], ['Cowboy Cooking Fat 1kg', 295, 241], ['Royco Beef Cubes 20s', 110, 76], ['Royco Chicken Cubes 20s', 110, 76], ['Knorr Beef Cubes 20s', 118, 82], ['Tomato Paste 70g', 45, 29], ['Peptang Tomato Sauce 400g', 150, 109], ['Zesta Jam 500g', 248, 191], ['Blue Band 500g', 286, 232], ['Prestige Margarine 500g', 265, 214], ['Cumin Powder 100g', 98, 67], ['Pilau Masala 100g', 95, 64], ['Curry Powder 100g', 88, 58], ['Black Pepper 50g', 118, 82], ['Garlic Powder 50g', 105, 72], ['Soy Sauce 250ml', 165, 121], ['Vinegar 500ml', 95, 62], ['Baking Powder 100g', 65, 41], ['Yeast 50g', 78, 52],
+            ]],
+            ['category' => 'household', 'tax' => 'standard', 'items' => [
+                ['Ariel Detergent 500g', 245, 195], ['Toss Detergent 500g', 172, 129], ['Sunlight Detergent 500g', 188, 143], ['Kleesoft Detergent 1kg', 238, 181], ['Jik Lemon 750ml', 175, 132], ['Jik Regular 750ml', 175, 132], ['Harpic Toilet Cleaner 500ml', 245, 194], ['Domestos 750ml', 238, 188], ['Velvex Kitchen Towels 2s', 185, 132], ['Hanan Tissue 10 Pack', 155, 116], ['Rosy Tissue 10 Pack', 148, 110], ['Scotch Brite Sponge 3 Pack', 135, 92], ['Steel Wool 12 Pack', 95, 61], ['Dishwashing Liquid 750ml', 168, 121], ['Morning Fresh 400ml', 165, 118], ['Air Freshener Lavender 300ml', 220, 162], ['Mortein Doom 400ml', 345, 278], ['Raid Insect Killer 300ml', 335, 265], ['Trash Bags Medium 20s', 210, 151], ['Aluminium Foil 10m', 185, 132], ['Cling Film 30m', 175, 128], ['Toothpicks 1000s', 55, 31], ['Serviettes 100s', 95, 61], ['Shoe Polish Black 40ml', 85, 54], ['Shoe Polish Brown 40ml', 85, 54], ['Mop Head Cotton', 185, 132], ['Broom Soft Indoor', 220, 159], ['Dustpan Set', 260, 190], ['Peg Pack 24s', 95, 62], ['Candles 8 Pack', 118, 82],
+            ]],
+            ['category' => 'personal-care', 'tax' => 'standard', 'items' => [
+                ['Geisha Soap 90g', 78, 52], ['Imperial Leather Soap 100g', 92, 64], ['Lifebuoy Soap 90g', 86, 58], ['Dettol Handwash 250ml', 245, 186], ['Nivea Lotion 400ml', 545, 432], ['Garnier Lotion 400ml', 495, 392], ['Colgate Herbal 100ml', 138, 99], ['Sensodyne 75ml', 345, 275], ['Aquafresh 100ml', 128, 91], ['Closeup Red Hot 100ml', 125, 88], ['Nice & Lovely Hair Food 250g', 185, 139], ['Venus Hair Oil 250ml', 175, 132], ['Always Cotton Soft 8s', 138, 102], ['Kotex Normal 8s', 148, 109], ['Cotton Wool 100g', 85, 54], ['Ear Buds 100s', 75, 48], ['Rexona Roll On 50ml', 245, 188], ['Nivea Roll On 50ml', 265, 206], ['Vaseline Lip Therapy', 185, 132], ['Hand Sanitizer 100ml', 95, 61], ['Surgical Mask 10s', 120, 78], ['Toothbrush Medium', 75, 44],
+            ]],
+            ['category' => 'baby-care', 'tax' => 'standard', 'items' => [
+                ['Pampers Premium S2', 785, 653], ['Pampers Pants S5', 1120, 945], ['Huggies Wipes 56s', 185, 138], ['Softcare Diapers S3', 680, 560], ['Softcare Diapers S4', 720, 598], ['Baby Petroleum Jelly 250ml', 135, 96], ['Baby Powder 100g', 145, 102], ['Cerelac Wheat 400g', 485, 392], ['Nan Infant Formula 400g', 1180, 1015], ['Lactogen 400g', 1050, 898], ['Baby Bottle 250ml', 220, 156], ['Pacifier 2 Pack', 185, 132],
+            ]],
+            ['category' => 'snacks-biscuits', 'tax' => 'zero', 'items' => [
+                ['Britania Digestive 250g', 125, 88], ['Manji Digestive 200g', 108, 74], ['Oreo Original 154g', 165, 121], ['Bakers Inn Cookies 300g', 145, 106], ['Tropical Heat Crisps 50g', 65, 42], ['Krackles Crisps 50g', 60, 39], ['Chevda 200g', 145, 101], ['Peanuts Salted 200g', 155, 109], ['Cashew Nuts 100g', 285, 218], ['Popcorn Pack 100g', 55, 32], ['Blueberry Muffin', 65, 38], ['Queen Cake 6 Pack', 180, 126], ['Mcvities Shortbread 200g', 185, 139], ['Tamu Tamu Lollipop 50s', 235, 169], ['PK Chewing Gum', 20, 11], ['Big G Gum', 15, 8], ['Chocolate Bar 40g', 95, 61], ['Dairy Milk 80g', 185, 132], ['Mandazi Pack 4s', 80, 45], ['Samosa Beef', 60, 36], ['Sausage Roll', 85, 52], ['Fruit Cake 400g', 285, 205],
+            ]],
+        ];
+
+        $products = [];
+        $barcodeCounter = 6161100200000;
+
+        foreach ($groups as $group) {
+            foreach ($group['items'] as $item) {
+                if (count($products) >= $needed) {
+                    break 2;
+                }
+
+                [$name, $basePrice, $costPrice] = $item;
+                $sku = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '-', $name));
+                $sku = trim($sku, '-');
+
+                $products[] = [
+                    'name' => $name,
+                    'sku' => $sku,
+                    'barcode' => (string) $barcodeCounter++,
+                    'category' => $group['category'],
+                    'tax' => $group['tax'],
+                    'base_price' => (float) $basePrice,
+                    'cost_price' => (float) $costPrice,
+                    'stock_quantity' => random_int(8, 60),
+                    'allow_fractional_sales' => false,
+                    'last_received_date' => $now->copy()->subDays(random_int(1, 45)),
+                    'batch_expiry_date' => in_array($group['category'], ['dairy-chilled', 'snacks-biscuits', 'beverages', 'staples-flours', 'cooking-essentials'], true)
+                        ? $now->copy()->addDays(random_int(14, 360))
+                        : null,
+                ];
+            }
+        }
+
+        return $products;
     }
 
     private function seedCustomers()
@@ -324,41 +395,50 @@ class DatabaseSeeder extends Seeder
 
     private function seedHistoricalSales($products, $customers, array $cashiers): void
     {
-        $weightedSkus = [
-            'KABRAS-2KG', 'KABRAS-2KG', 'KABRAS-2KG',
-            'AJAB-2KG', 'AJAB-2KG',
-            'JOGOO-2KG', 'JOGOO-2KG',
-            'BROOKSIDE-500ML', 'BROOKSIDE-500ML', 'KCC-MALA-500ML',
-            'FRESH-FRI-3L',
-            'KETEPA-100S',
-            'BLUE-BAND-1KG',
-            'PLASTIC-BAGS-SMALL', 'PLASTIC-BAGS-SMALL', 'PLASTIC-BAGS-SMALL',
-            'LOOSE-SUGAR', 'LOOSE-SUGAR',
-            'KEROSENE', 'KEROSENE',
-            'BAHARI-SALT-1KG',
-            'NDUME-BEANS-1KG',
-            'PISHORI-2KG',
-            'COKE-500ML', 'FANTA-500ML', 'SPRITE-500ML',
-            'KERINGET-1.5L',
-            'TAIFA-MATCHES-10',
-            'ORBIT-PEPPERMINT',
-            'EGGS-TRAY-30',
-        ];
+        $allSkus = array_values($products->keys()->all());
+        $weightedSkus = [];
 
-        $peakHours = [7, 8, 8, 9, 10, 12, 12, 13, 13, 14, 17, 17, 18, 18, 19, 20];
+        foreach ($allSkus as $index => $sku) {
+            $product = $products[$sku];
+            $weight = 1;
+
+            if ((float) $product->base_price <= 150) {
+                $weight += 2;
+            }
+
+            if (str_contains($sku, 'MILK') || str_contains($sku, 'BREAD') || str_contains($sku, 'COKE') || str_contains($sku, 'FANTA') || str_contains($sku, 'SUGAR') || str_contains($sku, 'FLOUR')) {
+                $weight += 3;
+            }
+
+            if ($index < 60) {
+                $weight += 1;
+            }
+
+            foreach (range(1, $weight) as $_) {
+                $weightedSkus[] = $sku;
+            }
+        }
+
+        $peakHours = [7, 8, 8, 9, 10, 11, 12, 12, 13, 13, 14, 16, 17, 17, 18, 18, 19, 20, 20];
+        $quietHours = [6, 10, 11, 15, 16, 21];
         $saleCounter = 1;
 
-        for ($dayOffset = 29; $dayOffset >= 0; $dayOffset--) {
-            $salesForDay = 6 + (($dayOffset + 3) % 4);
+        for ($dayOffset = 179; $dayOffset >= 0; $dayOffset--) {
+            $day = now()->subDays($dayOffset)->startOfDay();
+            $dayOfWeek = (int) $day->format('N');
+            $dayOfMonth = (int) $day->format('j');
+            $monthWave = sin(($dayOffset / 180) * pi() * 3);
+            $weekendBoost = $dayOfWeek >= 6 ? 8 : 0;
+            $paydayBoost = ($dayOfMonth >= 25 || $dayOfMonth <= 3) ? 7 : 0;
+            $midMonthDip = ($dayOfMonth >= 12 && $dayOfMonth <= 19) ? -5 : 0;
+            $salesForDay = max(7, (int) round(16 + $weekendBoost + $paydayBoost + $midMonthDip + ($monthWave * 4) + random_int(-4, 5)));
 
             for ($index = 0; $index < $salesForDay; $index++) {
-                $createdAt = now()
-                    ->subDays($dayOffset)
-                    ->setTime($peakHours[array_rand($peakHours)], random_int(0, 59), random_int(0, 59));
-
+                $hourPool = random_int(1, 100) <= 78 ? $peakHours : $quietHours;
+                $createdAt = $day->copy()->setTime($hourPool[array_rand($hourPool)], random_int(0, 59), random_int(0, 59));
                 $cashier = $cashiers[array_rand($cashiers)];
-                $customer = random_int(1, 100) <= 60 ? $customers->random() : null;
-                $lineCount = random_int(1, 4);
+                $customer = random_int(1, 100) <= 46 ? $customers->random() : null;
+                $lineCount = random_int(1, random_int(2, 7));
                 $selectedSkus = [];
                 $saleItems = [];
                 $subtotal = 0.0;
@@ -405,7 +485,8 @@ class DatabaseSeeder extends Seeder
                     'discount_total' => $discountTotal,
                     'grand_total' => $grandTotal,
                     'status' => 'completed',
-                    'receipt_number' => sprintf('SIM-%s-%04d', $createdAt->format('Ymd'), $saleCounter),
+                    'receipt_number' => sprintf('SIM-%s-%05d', $createdAt->format('Ymd'), $saleCounter),
+                    'client_checkout_id' => sprintf('seed-%s-%05d', $createdAt->format('Ymd'), $saleCounter),
                     'created_at' => $createdAt,
                     'updated_at' => $createdAt,
                 ]);
@@ -423,15 +504,16 @@ class DatabaseSeeder extends Seeder
                     ]);
                 }
 
-                $method = random_int(1, 100) <= 58 ? 'mpesa' : 'cash';
+                $methodRoll = random_int(1, 100);
+                $method = $methodRoll <= 62 ? 'mpesa' : ($methodRoll <= 94 ? 'cash' : 'card');
 
                 Payment::query()->create([
                     'sale_id' => $sale->id,
                     'method' => $method,
                     'amount' => $grandTotal,
                     'reference_number' => $method === 'mpesa'
-                        ? sprintf('QK%s%04d', $createdAt->format('mdHi'), $saleCounter)
-                        : null,
+                        ? sprintf('QK%s%05d', $createdAt->format('mdHi'), $saleCounter)
+                        : ($method === 'card' ? sprintf('CARD%s%05d', $createdAt->format('md'), $saleCounter) : null),
                     'status' => 'completed',
                     'created_at' => $createdAt,
                     'updated_at' => $createdAt,

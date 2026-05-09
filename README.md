@@ -68,28 +68,49 @@ This seeds:
 
 ### 4) Start the app
 
-Run Laravel:
+Recommended cross-platform command for Windows, macOS, and Linux:
 
 ```bash
-php artisan serve
+composer dev
 ```
 
-Run Vite:
+This starts:
+
+- Laravel backend: `http://127.0.0.1:7076`
+- Vite frontend assets/HMR: `http://127.0.0.1:7075`
+- Queue listener for background jobs
+
+Open the Laravel URL in your browser, not the Vite URL:
+
+```text
+http://127.0.0.1:7076
+```
+
+If you prefer separate terminals:
 
 ```bash
+php artisan serve --host=127.0.0.1 --port=7076
 npm run dev
+php artisan queue:listen --tries=1 --timeout=0
 ```
 
-Optional queue worker for background jobs like cloud sync and receipt printer scaffolding:
+Laravel Pail is intentionally not part of `composer dev` because PHP's `pcntl` extension is not available on native Windows. On Windows, tail logs with PowerShell:
+
+```powershell
+Get-Content storage\logs\laravel.log -Wait
+```
+
+On macOS/Linux with `pcntl`, you can still run:
 
 ```bash
-php artisan queue:work
+composer dev:pail
 ```
 
 ## Access points
 
-- POS terminal: `http://127.0.0.1:8000/pos`
-- Filament admin: `http://127.0.0.1:8000/admin`
+- POS terminal: `http://127.0.0.1:7076/pos`
+- Owner analytics: `http://127.0.0.1:7076/dashboard`
+- Filament admin: `http://127.0.0.1:7076/admin`
 
 ## Demo credentials
 
@@ -158,7 +179,7 @@ When `enable_credit_sales` is enabled:
 Open a shift:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/shifts/open \
+curl -X POST http://127.0.0.1:7076/api/shifts/open \
   -H "Accept: application/json" \
   -H "X-CSRF-TOKEN: <token>" \
   -b cookie.txt -c cookie.txt \
@@ -168,7 +189,7 @@ curl -X POST http://127.0.0.1:8000/api/shifts/open \
 Close a shift:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/shifts/close \
+curl -X POST http://127.0.0.1:7076/api/shifts/close \
   -H "Accept: application/json" \
   -H "X-CSRF-TOKEN: <token>" \
   -b cookie.txt -c cookie.txt \
@@ -186,6 +207,17 @@ Current behavior:
 - builds an ESC/POS byte payload
 - logs the raw hex payload
 - leaves the final USB/network adapter implementation for the next iteration
+
+
+## Verification
+
+Before committing or deploying local changes, run:
+
+```bash
+php artisan test
+npm run build
+npm audit --omit=dev
+```
 
 ## Tests
 
