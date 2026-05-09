@@ -1,18 +1,18 @@
 <template>
-    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+    <section class="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
         <div class="flex items-center justify-between gap-4">
             <div>
-                <h2 class="text-xl font-black tracking-tight text-slate-950">{{ title }}</h2>
-                <p class="mt-2 text-sm leading-6 text-slate-600">{{ description }}</p>
+                <h2 class="text-lg font-medium tracking-tight text-zinc-50">{{ title }}</h2>
+                <p class="mt-1 text-xs leading-5 text-zinc-400">{{ description }}</p>
             </div>
-            <button class="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50" :disabled="loading" @click="$emit('refresh')">
+            <button class="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-900 disabled:opacity-50" :disabled="loading" @click="$emit('refresh')">
                 Refresh
             </button>
         </div>
 
-        <div class="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-            <div v-if="loading" class="flex min-h-[22rem] items-center justify-center text-sm text-slate-500">Loading chart…</div>
-            <div v-else-if="error" class="flex min-h-[22rem] items-center justify-center text-sm text-red-600">{{ error }}</div>
+        <div class="mt-5 rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+            <div v-if="loading" class="flex min-h-[22rem] items-center justify-center text-sm text-zinc-500">Loading chart…</div>
+            <div v-else-if="error" class="flex min-h-[22rem] items-center justify-center text-sm text-rose-300">{{ error }}</div>
             <div v-else class="h-[22rem]">
                 <canvas ref="canvas"></canvas>
             </div>
@@ -90,16 +90,26 @@ function renderChart() {
                 legend: {
                     labels: {
                         usePointStyle: true,
+                        color: '#a1a1aa',
                     },
+                },
+                tooltip: {
+                    backgroundColor: '#18181b',
+                    borderColor: '#27272a',
+                    borderWidth: 1,
+                    titleColor: '#fafafa',
+                    bodyColor: '#d4d4d8',
                 },
             },
             scales: {
                 y: {
                     beginAtZero: true,
-                    grid: { color: 'rgba(148, 163, 184, 0.25)' },
+                    grid: { color: 'rgba(113, 113, 122, 0.18)' },
+                    ticks: { color: '#71717a' },
                 },
                 x: {
                     grid: { display: false },
+                    ticks: { color: '#71717a' },
                 },
             },
         },
