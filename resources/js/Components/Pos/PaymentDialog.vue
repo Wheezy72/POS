@@ -1,43 +1,43 @@
 <template>
-    <div v-if="show" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="payment-dialog-title">
-        <div class="w-full max-w-5xl rounded-3xl border border-slate-200 bg-white shadow-2xl">
-            <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+    <div v-if="show" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/30 p-2" role="dialog" aria-modal="true" aria-labelledby="payment-dialog-title">
+        <div class="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-200 px-3 py-2">
                 <div class="flex items-center gap-3">
-                    <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
-                        <BanknotesIcon class="h-5 w-5" />
+                    <span class="flex h-8 w-8 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700">
+                        <BanknotesIcon class="h-4 w-4" />
                     </span>
                     <div>
                         <p id="payment-dialog-title" class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Tender sale</p>
-                        <p class="mt-1 text-xs text-slate-500">Choose one payment path. Buttons lock while checkout is processing.</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Choose one payment path. Buttons lock while checkout is processing.</p>
                     </div>
                 </div>
                 <button class="rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold hover:bg-slate-50" :disabled="checkoutBusy" @click="$emit('close')">Esc</button>
             </div>
 
-            <div class="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <div class="grid gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <section>
                     <div class="flex flex-wrap gap-2">
-                        <button class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTabModel === 'cash' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'cash'">
-                            <BanknotesIcon class="h-4 w-4" />
+                        <button class="inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-bold" :class="paymentTabModel === 'cash' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'cash'">
+                            <span class="flex h-6 w-8 items-center justify-center rounded-md bg-emerald-100 text-[10px] font-black text-emerald-700">KES</span>
                             Cash
                         </button>
-                        <button class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTabModel === 'stk' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'stk'">
-                            <DevicePhoneMobileIcon class="h-4 w-4" />
+                        <button class="inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-bold" :class="paymentTabModel === 'stk' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'stk'">
+                            <span class="flex h-6 w-8 items-center justify-center rounded-md bg-green-600 text-[10px] font-black text-white">M</span>
                             M-PESA STK
                         </button>
-                        <button class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTabModel === 'live' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'live'">
-                            <SignalIcon class="h-4 w-4" />
-                            C2B live feed
+                        <button class="inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-bold" :class="paymentTabModel === 'live' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'live'">
+                            <span class="flex h-6 w-8 items-center justify-center rounded-md bg-lime-100 text-[10px] font-black text-lime-700">C2B</span>
+                            Live feed
                         </button>
-                        <button v-if="creditSalesEnabled" class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" :class="paymentTabModel === 'credit' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'credit'">
-                            <ClockIcon class="h-4 w-4" />
-                            [F7] Pay later
+                        <button v-if="creditSalesEnabled" class="inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-bold" :class="paymentTabModel === 'credit' ? activeTabClass : inactiveTabClass" :disabled="checkoutBusy" @click="paymentTabModel = 'credit'">
+                            <span class="flex h-6 w-8 items-center justify-center rounded-md bg-yellow-100 text-[10px] font-black text-yellow-800">IOU</span>
+                            [F7] Credit
                         </button>
                     </div>
 
-                    <div v-if="paymentTabModel === 'cash'" class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div v-if="paymentTabModel === 'cash'" class="mt-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <label class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Cash received</label>
-                        <input ref="cashInput" v-model.number="cashReceivedModel" type="number" min="0" step="0.01" class="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-xl font-black outline-none focus:border-emerald-500">
+                        <input ref="cashInput" v-model.number="cashReceivedModel" type="number" min="0" step="0.01" class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-base font-black outline-none focus:border-emerald-500">
                         <div class="grid gap-2 sm:grid-cols-4">
                             <button v-for="preset in cashPresets" :key="preset" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-bold hover:bg-slate-100 disabled:opacity-50" :disabled="checkoutBusy" @click="cashReceivedModel = preset">
                                 {{ formatCurrency(preset) }}
@@ -46,24 +46,24 @@
                         <p class="text-sm" :class="cashChange >= 0 ? 'text-emerald-600' : 'text-red-600'">
                             Change: {{ formatCurrency(cashChange) }}
                         </p>
-                        <button class="inline-flex items-center justify-between rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="$emit('cash-checkout')">
+                        <button class="inline-flex items-center justify-between rounded-2xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="$emit('cash-checkout')">
                             <span>{{ checkoutBusy ? 'Processing…' : 'Complete cash sale' }}</span>
-                            <ArrowPathIcon v-if="checkoutBusy" class="h-5 w-5 animate-spin" />
-                            <CheckCircleIcon v-else class="h-5 w-5" />
+                            <ArrowPathIcon v-if="checkoutBusy" class="h-4 w-4 animate-spin" />
+                            <CheckCircleIcon v-else class="h-4 w-4" />
                         </button>
                     </div>
 
-                    <div v-else-if="paymentTabModel === 'stk'" class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div v-else-if="paymentTabModel === 'stk'" class="mt-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <label class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Customer phone</label>
-                        <input v-model.trim="stkPhoneModel" type="text" class="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-lg font-bold outline-none focus:border-emerald-500" placeholder="2547XXXXXXXX">
-                        <button class="inline-flex items-center justify-between rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="$emit('stk-checkout')">
+                        <input v-model.trim="stkPhoneModel" type="text" class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-base font-bold outline-none focus:border-emerald-500" placeholder="2547XXXXXXXX">
+                        <button class="inline-flex items-center justify-between rounded-2xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0" @click="$emit('stk-checkout')">
                             <span>{{ checkoutBusy ? 'Sending STK…' : 'Start STK and checkout' }}</span>
-                            <ArrowPathIcon v-if="checkoutBusy" class="h-5 w-5 animate-spin" />
-                            <DevicePhoneMobileIcon v-else class="h-5 w-5" />
+                            <ArrowPathIcon v-if="checkoutBusy" class="h-4 w-4 animate-spin" />
+                            <DevicePhoneMobileIcon v-else class="h-4 w-4" />
                         </button>
                     </div>
 
-                    <div v-else-if="paymentTabModel === 'live'" class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div v-else-if="paymentTabModel === 'live'" class="mt-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <div class="max-h-64 overflow-auto rounded-2xl border border-slate-200 bg-white">
                             <div v-if="livePayments.length === 0" class="px-4 py-6 text-sm text-slate-500">No pending M-PESA deposits.</div>
                             <button
@@ -83,39 +83,39 @@
                                 </div>
                             </button>
                         </div>
-                        <button class="inline-flex items-center justify-between rounded-2xl border border-emerald-600 bg-emerald-600 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || !selectedLivePayment || cart.length === 0" @click="$emit('live-feed-checkout')">
+                        <button class="inline-flex items-center justify-between rounded-2xl border border-emerald-600 bg-emerald-600 px-3 py-2 text-left font-black uppercase tracking-[0.18em] text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || !selectedLivePayment || cart.length === 0" @click="$emit('live-feed-checkout')">
                             <span>{{ checkoutBusy ? 'Claiming…' : 'Claim inbound payment and checkout' }}</span>
-                            <ArrowPathIcon v-if="checkoutBusy" class="h-5 w-5 animate-spin" />
-                            <SignalIcon v-else class="h-5 w-5" />
+                            <ArrowPathIcon v-if="checkoutBusy" class="h-4 w-4 animate-spin" />
+                            <SignalIcon v-else class="h-4 w-4" />
                         </button>
                     </div>
 
-                    <div v-else class="mt-4 grid gap-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <div v-else class="mt-3 grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <label class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Customer phone</label>
-                        <input v-model.trim="customerPhoneModel" type="text" class="h-12 rounded-2xl border border-slate-300 bg-white px-3 text-lg font-bold outline-none focus:border-yellow-500" placeholder="2547XXXXXXXX">
-                        <button class="inline-flex items-center justify-between rounded-2xl border border-yellow-300 bg-yellow-300 px-4 py-3 text-left font-black uppercase tracking-[0.18em] text-slate-950 hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0 || !customerPhone" @click="$emit('credit-checkout')">
+                        <input v-model.trim="customerPhoneModel" type="text" class="h-10 rounded-xl border border-slate-300 bg-white px-3 text-base font-bold outline-none focus:border-yellow-500" placeholder="2547XXXXXXXX">
+                        <button class="inline-flex items-center justify-between rounded-2xl border border-yellow-300 bg-yellow-300 px-3 py-2 text-left font-black uppercase tracking-[0.18em] text-slate-950 hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-50" :disabled="checkoutBusy || cart.length === 0 || !customerPhone" @click="$emit('credit-checkout')">
                             <span>{{ checkoutBusy ? 'Saving…' : 'Save as credit sale' }}</span>
-                            <ArrowPathIcon v-if="checkoutBusy" class="h-5 w-5 animate-spin" />
-                            <ClockIcon v-else class="h-5 w-5" />
+                            <ArrowPathIcon v-if="checkoutBusy" class="h-4 w-4 animate-spin" />
+                            <ClockIcon v-else class="h-4 w-4" />
                         </button>
                     </div>
                 </section>
 
                 <aside class="grid gap-3">
-                    <section class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <section class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                         <p class="text-[11px] uppercase tracking-[0.22em] text-slate-500">Manager PIN</p>
-                        <input v-model.trim="managerPinModel" type="password" maxlength="6" class="mt-3 h-12 w-full rounded-2xl border border-slate-300 bg-white px-3 text-lg font-bold outline-none focus:border-yellow-500" placeholder="Only needed below margin floor">
+                        <input v-model.trim="managerPinModel" type="password" maxlength="6" class="mt-3 h-12 w-full rounded-2xl border border-slate-300 bg-white px-3 text-base font-bold outline-none focus:border-yellow-500" placeholder="Only needed below margin floor">
                     </section>
 
-                    <section class="rounded-3xl border border-yellow-300 bg-yellow-300 p-4 text-slate-950 shadow-sm">
+                    <section class="rounded-2xl border border-yellow-300 bg-yellow-300 p-4 text-slate-950 shadow-sm">
                         <p class="text-sm font-black uppercase tracking-[0.18em]">Summary</p>
                         <div class="mt-4 grid grid-cols-[1fr_auto] gap-y-2">
                             <span class="font-bold uppercase tracking-[0.16em]">Subtotal</span>
                             <span class="text-right font-black">{{ formatCurrency(subtotal) }}</span>
                             <span class="font-bold uppercase tracking-[0.16em]">Tax</span>
                             <span class="text-right font-black">{{ formatCurrency(tax) }}</span>
-                            <span class="border-t border-slate-950 pt-2 text-lg font-black uppercase tracking-[0.18em]">Grand total</span>
-                            <span class="border-t border-slate-950 pt-2 text-right text-4xl font-black">{{ formatCurrency(grandTotal) }}</span>
+                            <span class="border-t border-slate-950 pt-2 text-base font-black uppercase tracking-[0.18em]">Grand total</span>
+                            <span class="border-t border-slate-950 pt-2 text-right text-3xl font-black">{{ formatCurrency(grandTotal) }}</span>
                         </div>
                     </section>
                 </aside>
