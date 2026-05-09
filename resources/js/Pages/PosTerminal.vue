@@ -1,343 +1,228 @@
 <template>
     <Head title="POS Terminal" />
 
-    <div class="flex h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">
-        <!-- LEFT: Cart + Live Feed -->
-        <aside class="flex w-[340px] shrink-0 flex-col border-r border-zinc-800 bg-zinc-900">
-            <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-                <div>
-                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Register</p>
-                    <p class="mt-0.5 text-sm font-medium text-zinc-100">{{ currentUser?.name ?? 'Locked' }}</p>
+    <div class="grid h-screen w-full grid-cols-[35%_45%_20%] grid-rows-[4.75rem_minmax(0,1fr)] overflow-hidden bg-[#0f172a] text-slate-100">
+        <aside class="row-span-2 flex min-w-0 flex-col border-r border-slate-700/70 bg-[#111827]">
+            <header class="flex h-[4.75rem] items-center justify-between border-b border-slate-700/70 px-4">
+                <div class="min-w-0">
+                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-slate-500">Active cart</p>
+                    <p class="mt-1 truncate text-sm font-medium text-slate-100">{{ currentUser?.name ?? 'Register locked' }}</p>
                 </div>
-                <div class="text-right">
-                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">{{ transactionId }}</p>
-                    <p class="mt-0.5 font-mono text-sm text-zinc-300 tabular-nums">{{ clock }}</p>
+                <div class="text-right font-mono">
+                    <p class="text-[10px] uppercase tracking-[0.18em] text-slate-500">{{ transactionId }}</p>
+                    <p class="mt-1 text-sm text-slate-300 tabular-nums">{{ clock }}</p>
                 </div>
             </header>
 
-            <div class="flex items-center justify-between px-5 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
-                <span>Cart · {{ totalUnits }} item{{ totalUnits === 1 ? '' : 's' }}</span>
-                <button
-                    v-if="cart.length"
-                    type="button"
-                    class="font-medium text-zinc-400 hover:text-zinc-200"
-                    @click="newSale(true)"
-                >
-                    Clear
-                </button>
+            <div class="grid grid-cols-[minmax(0,1fr)_4.75rem_7.5rem_2rem] border-b border-slate-700/70 bg-slate-950/40 px-3 py-2 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
+                <span>Name</span>
+                <span class="text-center">Qty</span>
+                <span class="text-right">Price</span>
+                <span></span>
             </div>
 
-            <div class="flex-1 overflow-y-auto px-3 pb-3">
-                <ul v-if="cart.length" v-auto-animate class="space-y-1.5">
+            <div class="min-h-0 flex-1 overflow-y-auto">
+                <ul v-if="cart.length" v-auto-animate class="divide-y divide-slate-800/80">
                     <li
                         v-for="item in cart"
                         :key="item.product_id"
-                        class="rounded-lg border border-zinc-800/80 bg-zinc-900 px-3 py-2.5 hover:border-zinc-700"
+                        class="grid grid-cols-[minmax(0,1fr)_4.75rem_7.5rem_2rem] items-center gap-2 px-3 py-2 text-sm hover:bg-slate-800/45"
                     >
-                        <div class="flex items-start justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="truncate text-sm text-zinc-100">{{ item.name }}</p>
-                                <p class="mt-0.5 text-xs text-zinc-500">{{ item.sku }}</p>
-                            </div>
-                            <button
-                                type="button"
-                                class="shrink-0 text-zinc-500 hover:text-red-400"
-                                aria-label="Remove item"
-                                @click="removeItem(item.product_id)"
+                        <div class="min-w-0">
+                            <p class="truncate font-medium text-slate-100">{{ item.name }}</p>
+                            <p class="mt-0.5 truncate font-mono text-[11px] text-slate-500">{{ item.sku }}</p>
+                        </div>
+                        <div class="flex items-center justify-center gap-1">
+                            <button type="button" class="qty-button" aria-label="Reduce quantity" @click="changeQty(item, -1)">−</button>
+                            <input
+                                :value="item.quantity"
+                                inputmode="decimal"
+                                class="h-7 w-10 rounded border border-slate-700 bg-slate-950 px-1 text-center font-mono text-xs text-slate-100 outline-none focus:border-sky-400/70"
+                                @input="(event) => { item.quantity = Number(event.target.value) || 0 }"
+                                @change="normalizeQuantity(item)"
                             >
-                                <XMarkIcon class="h-4 w-4" />
-                            </button>
+                            <button type="button" class="qty-button" aria-label="Increase quantity" @click="changeQty(item, 1)">+</button>
                         </div>
-                        <div class="mt-2 flex items-center justify-between text-xs">
-                            <div class="flex items-center gap-1.5">
-                                <button type="button" class="h-6 w-6 rounded border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100" @click="changeQty(item, -1)">−</button>
-                                <input
-                                    :value="item.quantity"
-                                    inputmode="decimal"
-                                    class="h-6 w-12 rounded border border-zinc-800 bg-zinc-950 px-2 text-center text-zinc-100 outline-none focus:border-blue-500/60 tabular-nums"
-                                    @input="(event) => { item.quantity = Number(event.target.value) || 0 }"
-                                    @change="normalizeQuantity(item)"
-                                >
-                                <button type="button" class="h-6 w-6 rounded border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100" @click="changeQty(item, 1)">+</button>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-zinc-400 tabular-nums">{{ formatCurrency(effectiveUnitPrice(item)) }}</p>
-                                <p class="font-medium text-zinc-100 tabular-nums">{{ formatCurrency(lineTotal(item)) }}</p>
-                            </div>
+                        <div class="text-right font-mono">
+                            <p class="text-[11px] text-slate-500 tabular-nums">{{ formatKsh(effectiveUnitPrice(item)) }}</p>
+                            <p class="font-medium text-amber-300 tabular-nums">{{ formatKsh(lineTotal(item)) }}</p>
                         </div>
+                        <button type="button" class="text-sm text-slate-500 hover:text-rose-300" aria-label="Remove item" @click="removeItem(item.product_id)">×</button>
                     </li>
                 </ul>
 
-                <div v-else class="mt-12 flex flex-col items-center text-center">
-                    <ShoppingCartIcon class="h-8 w-8 text-zinc-700" />
-                    <p class="mt-3 text-sm text-zinc-400">Cart is empty</p>
-                    <p class="mt-1 text-xs text-zinc-600">Scan a barcode or press F2 to search.</p>
+                <div v-else class="flex h-full flex-col items-center justify-center px-8 text-center">
+                    <p class="text-sm font-medium text-slate-300">Cart is empty</p>
+                    <p class="mt-2 text-xs text-slate-500">Scan a barcode, search with <kbd class="shortcut">F2</kbd>, or tap a product card.</p>
                 </div>
             </div>
 
-            <!-- Totals -->
-            <div class="border-t border-zinc-800 px-5 py-4">
-                <dl class="space-y-1.5 text-sm">
-                    <div class="flex justify-between text-zinc-400">
+            <div class="border-t border-slate-700/70 bg-slate-950 px-4 py-4">
+                <dl class="grid gap-1.5 text-sm">
+                    <div class="flex justify-between text-slate-400">
                         <dt>Subtotal</dt>
-                        <dd class="tabular-nums">{{ formatCurrency(subtotal) }}</dd>
+                        <dd class="font-mono tabular-nums">{{ formatKsh(subtotal) }}</dd>
                     </div>
-                    <div class="flex justify-between text-zinc-400">
+                    <div class="flex justify-between text-slate-400">
                         <dt>Tax</dt>
-                        <dd class="tabular-nums">{{ formatCurrency(tax) }}</dd>
+                        <dd class="font-mono tabular-nums">{{ formatKsh(tax) }}</dd>
                     </div>
                 </dl>
-                <div class="mt-3 flex items-baseline justify-between border-t border-zinc-800 pt-3">
-                    <span class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Total</span>
-                    <span class="text-2xl font-medium text-zinc-50 tabular-nums">{{ formatCurrency(grandTotal) }}</span>
+                <div class="mt-3 rounded-xl border border-amber-400/50 bg-amber-400/10 px-4 py-3">
+                    <div class="flex items-center justify-between gap-4">
+                        <span class="text-[11px] font-medium uppercase tracking-[0.22em] text-amber-200">Grand total</span>
+                        <span class="font-mono text-3xl font-medium text-amber-300 tabular-nums">{{ formatKsh(grandTotal) }}</span>
+                    </div>
                 </div>
-            </div>
-
-            <!-- Live feed -->
-            <div class="border-t border-zinc-800 bg-zinc-950/40">
-                <div class="flex items-center justify-between px-5 py-2.5">
-                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Live feed</p>
-                    <button
-                        type="button"
-                        class="text-[11px] text-zinc-500 hover:text-zinc-300"
-                        :disabled="liveFeedBusy"
-                        @click="fetchLivePayments"
-                    >
-                        {{ liveFeedBusy ? 'Refreshing…' : 'Refresh' }}
-                    </button>
-                </div>
-                <ul class="max-h-44 overflow-y-auto px-3 pb-3">
-                    <li
-                        v-for="event in feedItems"
-                        :key="event.id"
-                        class="flex items-start gap-2.5 rounded px-2 py-1.5 text-xs hover:bg-zinc-900"
-                        :class="event.tone === 'error' ? 'text-red-300' : event.tone === 'success' ? 'text-emerald-300' : 'text-zinc-400'"
-                    >
-                        <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" :class="event.tone === 'error' ? 'bg-red-500' : event.tone === 'success' ? 'bg-emerald-500' : 'bg-zinc-600'" />
-                        <div class="min-w-0">
-                            <p class="truncate">{{ event.message }}</p>
-                            <p class="mt-0.5 text-[10px] uppercase tracking-[0.2em] text-zinc-600">{{ event.at }}</p>
-                        </div>
-                    </li>
-                    <li v-if="!feedItems.length" class="px-2 py-1.5 text-xs text-zinc-600">No activity yet.</li>
-                </ul>
             </div>
         </aside>
 
-        <!-- CENTER: Search + Product Grid -->
-        <main class="flex min-w-0 flex-1 flex-col gap-4 p-4">
-            <div class="flex items-center gap-3">
-                <div class="relative flex-1">
-                    <BarcodeIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
-                    <input
-                        ref="scannerInput"
-                        v-model="barcode"
-                        type="text"
-                        autocomplete="off"
-                        spellcheck="false"
-                        placeholder="Scan barcode or type to search products"
-                        class="h-11 w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-10 pr-32 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/30"
-                        @keydown.enter.prevent="searchProducts()"
-                    >
-                    <kbd class="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">Enter</kbd>
-                </div>
-                <span class="hidden text-[11px] uppercase tracking-[0.22em] text-zinc-500 lg:inline">{{ resultCountLabel }}</span>
+        <header class="col-span-2 flex items-center gap-3 border-b border-slate-700/70 bg-[#111827] px-4">
+            <div class="relative flex-1">
+                <input
+                    ref="scannerInput"
+                    v-model="barcode"
+                    type="text"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="Scan barcode or search product name"
+                    class="h-12 w-full rounded-lg border border-sky-400/60 bg-slate-950 px-4 pr-28 text-base font-medium text-slate-100 outline-none placeholder:text-slate-500 focus:border-sky-300 focus:ring-2 focus:ring-sky-400/25"
+                    @keydown.enter.prevent="searchProducts()"
+                >
+                <kbd class="absolute right-3 top-1/2 -translate-y-1/2 shortcut border-sky-400/50 text-sky-200">Enter</kbd>
             </div>
+            <button type="button" class="top-action" @click="openSearchModal">
+                Search <kbd class="shortcut">F2</kbd>
+            </button>
+            <div class="hidden text-right font-mono text-[11px] uppercase tracking-[0.18em] text-slate-500 xl:block">
+                {{ resultCountLabel }}
+            </div>
+        </header>
 
-            <div class="-mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 pb-1">
+        <main class="flex min-w-0 flex-col gap-3 bg-[#0f172a] p-3">
+            <div class="flex shrink-0 gap-2 overflow-x-auto pb-1">
                 <button
                     v-for="category in categories"
                     :key="category.id"
                     type="button"
-                    class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition"
-                    :class="activeCategoryId === category.id
-                        ? 'border-zinc-100 bg-zinc-100 text-zinc-950'
-                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100'"
+                    class="category-tab"
+                    :class="activeCategoryId === category.id ? 'category-tab-active' : ''"
                     @click="activeCategoryId = category.id"
                 >
                     {{ category.name }}
                 </button>
             </div>
 
-            <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
-                <div v-if="searchBusy" class="px-1 pb-2 text-xs text-zinc-500">Searching…</div>
+            <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-slate-700/70 bg-slate-950/35 p-2">
+                <div v-if="searchBusy" class="px-1 pb-2 text-xs text-sky-300">Searching catalog…</div>
 
-                <div v-if="visibleProducts.length" class="grid grid-cols-3 gap-4 xl:grid-cols-4 2xl:grid-cols-5">
+                <div v-if="visibleProducts.length" class="grid grid-cols-3 gap-2 2xl:grid-cols-4">
                     <button
                         v-for="product in visibleProducts"
                         :key="product.id"
                         type="button"
-                        class="group relative flex aspect-square flex-col items-center justify-between overflow-hidden rounded-2xl border border-zinc-800/80 p-4 text-center transition hover:border-zinc-600 hover:shadow-lg hover:shadow-black/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                        :class="paletteFor(product).cardBg"
+                        class="product-card"
                         @click="addProductToCart(product)"
                     >
-                        <span class="text-[10px] font-medium uppercase tracking-[0.22em] opacity-70" :class="paletteFor(product).text">
-                            {{ categoryLabel(product) }}
-                        </span>
-                        <span
-                            class="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white/5 shadow-inner shadow-black/20 ring-1 ring-white/10"
-                            :class="paletteFor(product).iconBg"
-                        >
-                            <img v-if="product.logo_url" :src="product.logo_url" :alt="product.name" class="h-12 w-12 object-contain" loading="lazy" @error="onLogoError($event)" />
-                            <component :is="iconFor(product)" v-else class="h-7 w-7" />
-                            <component :is="iconFor(product)" class="logo-fallback hidden h-7 w-7" />
-                        </span>
-                        <div class="w-full">
-                            <p class="truncate text-base font-medium" :class="paletteFor(product).text">{{ product.name }}</p>
-                            <p class="mt-1 text-sm font-medium tabular-nums" :class="paletteFor(product).price">{{ formatCurrency(Number(product.base_price)) }}</p>
-                        </div>
+                        <span class="min-w-0 truncate text-left text-sm font-medium text-slate-100">{{ product.name }}</span>
+                        <span class="font-mono text-sm font-medium text-amber-300 tabular-nums">{{ formatKsh(Number(product.base_price)) }}</span>
                     </button>
                 </div>
 
                 <div v-else class="flex h-full flex-col items-center justify-center text-center">
-                    <MagnifyingGlassIcon class="h-8 w-8 text-zinc-700" />
-                    <p class="mt-3 text-sm text-zinc-400">No products match.</p>
-                    <p class="mt-1 text-xs text-zinc-600">Try a different category or clear the search.</p>
+                    <p class="text-sm font-medium text-slate-300">No products match.</p>
+                    <p class="mt-1 text-xs text-slate-500">Try another category or scan/search again.</p>
                 </div>
             </div>
         </main>
 
-        <!-- RIGHT: SambaPOS-style grouped function stack (KBAM-first) -->
-        <aside class="flex w-[360px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-zinc-800 bg-zinc-900 p-3">
-            <!-- Tender shortcuts -->
-            <section>
-                <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Tender</p>
-                <div class="grid grid-cols-3 gap-2">
-                    <button type="button" class="rail-tender rail-emerald" :disabled="!canCheckout" @click="quickCheckout('mpesa')">
-                        <DevicePhoneMobileIcon class="h-5 w-5" />
-                        <span>M-Pesa <span class="rail-tender-kbd">F4</span></span>
+        <aside class="flex min-w-0 flex-col gap-3 overflow-y-auto border-l border-slate-700/70 bg-[#111827] p-3">
+            <section class="control-section">
+                <p class="control-heading">Tender</p>
+                <div class="grid gap-2">
+                    <button type="button" class="control-button control-primary" :disabled="!canCheckout" @click="quickCheckout('mpesa')">
+                        <span>M-Pesa</span><kbd class="shortcut">F4</kbd>
                     </button>
-                    <button type="button" class="rail-tender rail-blue" :disabled="!canCheckout" @click="quickCheckout('cash')">
-                        <BanknotesIcon class="h-5 w-5" />
-                        <span>Cash <span class="rail-tender-kbd">F5</span></span>
+                    <button type="button" class="control-button control-primary" :disabled="!canCheckout" @click="quickCheckout('cash')">
+                        <span>Cash</span><kbd class="shortcut">F5</kbd>
                     </button>
-                    <button type="button" class="rail-tender rail-purple" :disabled="!canCheckout" @click="quickCheckout('card')">
-                        <CreditCardIcon class="h-5 w-5" />
-                        <span>Card <span class="rail-tender-kbd">F6</span></span>
+                    <button type="button" class="control-button control-primary" :disabled="!canCheckout" @click="quickCheckout('card')">
+                        <span>Card</span><kbd class="shortcut">F6</kbd>
                     </button>
-                </div>
-                <div class="mt-2 grid grid-cols-3 gap-2">
-                    <button type="button" class="rail-tender-sm rail-emerald-soft" :disabled="!canCheckout" @click="openLiveFeedTender">
-                        <span>Live feed</span>
-                        <span class="rail-tender-hint">M-Pesa C2B</span>
-                    </button>
-                    <button type="button" class="rail-tender-sm" :class="creditSalesEnabled ? 'rail-amber' : 'rail-disabled'" :disabled="!creditSalesEnabled || !canCheckout" @click="openCreditTender">
-                        <span>Credit · F7</span>
-                        <span class="rail-tender-hint">{{ creditSalesEnabled ? 'IOU' : 'Disabled' }}</span>
-                    </button>
-                    <button type="button" class="rail-tender-sm rail-zinc-strong" :disabled="!canCheckout" @click="openPayModal">
-                        <span>Split · pay</span>
-                        <span class="rail-tender-hint">choose tender</span>
+                    <button type="button" class="control-button" :disabled="!canCheckout" @click="openPayModal">
+                        <span>Split pay</span><kbd class="shortcut">F8</kbd>
                     </button>
                 </div>
             </section>
 
-            <!-- Sale controls -->
-            <section>
-                <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Sale controls</p>
-                <div class="grid grid-cols-3 gap-2">
-                    <button type="button" class="rail-cell rail-amber" @click="openDiscount">
-                        <TagIcon class="h-4 w-4" />
-                        <span>Discount<br><span class="rail-cell-hint">F3</span></span>
+            <section class="control-section">
+                <p class="control-heading">Sale controls</p>
+                <div class="grid gap-2">
+                    <button type="button" class="control-button control-warn" @click="openDiscount">
+                        <span>Discount</span><kbd class="shortcut">F3</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-rose" :disabled="!cart.length" @click="voidLastItem">
-                        <NoSymbolIcon class="h-4 w-4" />
-                        <span>Void item</span>
+                    <button type="button" class="control-button control-danger" :disabled="!cart.length" @click="voidLastItem">
+                        <span>Void item</span><kbd class="shortcut">Del</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-rose" :disabled="!cart.length" @click="cancelAll">
-                        <XMarkIcon class="h-4 w-4" />
-                        <span>Cancel all</span>
+                    <button type="button" class="control-button" :disabled="!cart.length" @click="holdSale">
+                        <span>Hold sale</span><kbd class="shortcut">F7</kbd>
                     </button>
-
-                    <button type="button" class="rail-cell rail-zinc" @click="openSearchModal">
-                        <MagnifyingGlassIcon class="h-4 w-4" />
-                        <span>Search<br><span class="rail-cell-hint">F2</span></span>
+                    <button type="button" class="control-button" :disabled="!heldSales.length" @click="recallHeldSale">
+                        <span>Recall held</span><span class="font-mono text-xs text-slate-400">{{ heldSales.length }}</span>
                     </button>
-                    <button type="button" class="rail-cell rail-zinc" :disabled="!cart.length" @click="holdSale">
-                        <PauseIcon class="h-4 w-4" />
-                        <span>Hold sale</span>
-                    </button>
-                    <button type="button" class="rail-cell rail-zinc" :disabled="!heldSales.length" @click="recallHeldSale">
-                        <ListIcon class="h-4 w-4" />
-                        <span>Recall<br><span class="rail-cell-hint">{{ heldSales.length }} held</span></span>
-                    </button>
-
-                    <button type="button" class="rail-cell rail-zinc" :disabled="!cart.length" @click="promptPriceOverride">
-                        <PencilIcon class="h-4 w-4" />
-                        <span>Price override</span>
-                    </button>
-                    <button type="button" class="rail-cell rail-zinc" :disabled="!cart.length" @click="promptQuantity">
-                        <HashIcon class="h-4 w-4" />
-                        <span>Set qty</span>
-                    </button>
-                    <button type="button" class="rail-cell rail-zinc" @click="addMiscItem">
-                        <PackagePlusIcon class="h-4 w-4" />
-                        <span>Misc item</span>
+                    <button type="button" class="control-button control-danger" :disabled="!cart.length" @click="cancelAll">
+                        <span>Cancel all</span><kbd class="shortcut">Ctrl+X</kbd>
                     </button>
                 </div>
             </section>
 
-            <!-- Customer + drawer -->
-            <section>
-                <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Customer · drawer</p>
-                <div class="grid grid-cols-3 gap-2">
-                    <button type="button" class="rail-cell rail-zinc" @click="promptAssignCustomer">
-                        <UserIcon class="h-4 w-4" />
-                        <span>Assign<br>customer</span>
+            <section class="control-section">
+                <p class="control-heading">Customer · drawer</p>
+                <div class="grid gap-2">
+                    <button type="button" class="control-button" @click="promptAssignCustomer">
+                        <span>Assign customer</span><kbd class="shortcut">F9</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-zinc" @click="recordDrawerOpen">
-                        <ArchiveIcon class="h-4 w-4" />
-                        <span>Open<br>drawer</span>
+                    <button type="button" class="control-button" :disabled="!cart.length" @click="promptPriceOverride">
+                        <span>Price override</span><kbd class="shortcut">Ctrl+P</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-zinc" @click="recordCashDrop">
-                        <ArrowDownIcon class="h-4 w-4" />
-                        <span>Cash drop</span>
+                    <button type="button" class="control-button" :disabled="!cart.length" @click="promptQuantity">
+                        <span>Set qty</span><kbd class="shortcut">Ctrl+Q</kbd>
                     </button>
-
-                    <button type="button" class="rail-cell rail-zinc" @click="recordPayout">
-                        <ArrowUpIcon class="h-4 w-4" />
-                        <span>Payout</span>
+                    <button type="button" class="control-button" @click="addMiscItem">
+                        <span>Misc item</span><kbd class="shortcut">Ctrl+M</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-zinc" :disabled="!lastSaleId" @click="reprintReceipt">
-                        <PrinterIcon class="h-4 w-4" />
-                        <span>Reprint</span>
+                    <button type="button" class="control-button" @click="recordDrawerOpen">
+                        <span>Open drawer</span><kbd class="shortcut">Ctrl+D</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-rose" :disabled="!lastSaleId" @click="voidLastSalePrompt">
-                        <UndoIcon class="h-4 w-4" />
-                        <span>Void sale</span>
+                    <button type="button" class="control-button" @click="recordCashDrop">
+                        <span>Cash drop</span><kbd class="shortcut">Alt+D</kbd>
+                    </button>
+                    <button type="button" class="control-button" @click="recordPayout">
+                        <span>Payout</span><kbd class="shortcut">Alt+P</kbd>
                     </button>
                 </div>
             </section>
 
-            <!-- Quick cash -->
-            <section>
-                <div class="flex items-center justify-between">
-                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Quick cash</p>
-                    <span class="text-[10px] uppercase tracking-[0.18em] text-zinc-600">tap to tender</span>
-                </div>
-                <div class="mt-2 grid grid-cols-4 gap-2">
-                    <button v-for="preset in cashPresetButtons" :key="preset" type="button" class="rail-money" :disabled="!canCheckout" @click="tenderExactCash(preset)">
-                        {{ formatCurrency(preset) }}
-                    </button>
-                </div>
-                <button type="button" class="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-500/40 bg-blue-500/10 text-sm font-medium text-blue-300 hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40" :disabled="!canCheckout" @click="tenderExactCash(grandTotal)">
-                    Exact cash · <span class="tabular-nums">{{ formatCurrency(grandTotal) }}</span>
-                </button>
-            </section>
-
-            <!-- Session -->
-            <section class="mt-auto border-t border-zinc-800 pt-3">
-                <div v-if="stkStatusMessage" class="mb-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-400">
+            <section class="control-section">
+                <p class="control-heading">System</p>
+                <div v-if="stkStatusMessage" class="mb-2 rounded border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-xs text-sky-200">
                     {{ stkStatusMessage }}
                 </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <button type="button" class="rail-cell rail-zinc h-12" @click="newSale(true)">
-                        <ArrowPathIcon class="h-4 w-4" />
-                        <span>New sale<br><span class="rail-cell-hint">F1</span></span>
+                <div class="grid gap-2">
+                    <button type="button" class="control-button" @click="newSale(true)">
+                        <span>New sale</span><kbd class="shortcut">F1</kbd>
                     </button>
-                    <button type="button" class="rail-cell rail-zinc h-12" @click="logout">
-                        <LockClosedIcon class="h-4 w-4" />
-                        <span>Lock<br><span class="rail-cell-hint">F10</span></span>
+                    <button type="button" class="control-button" :disabled="!lastReceiptNumber" @click="reprintReceipt">
+                        <span>Reprint</span><kbd class="shortcut">Ctrl+R</kbd>
+                    </button>
+                    <button type="button" class="control-button control-danger" :disabled="!lastSaleId" @click="voidLastSalePrompt">
+                        <span>Void sale</span><kbd class="shortcut">Alt+V</kbd>
+                    </button>
+                    <button type="button" class="control-button" @click="openSettings">
+                        <span>Settings</span><kbd class="shortcut">F12</kbd>
+                    </button>
+                    <button type="button" class="control-button control-danger" @click="logout">
+                        <span>Logout</span><kbd class="shortcut">F10</kbd>
                     </button>
                 </div>
             </section>
@@ -398,38 +283,26 @@
 </template>
 
 <style scoped>
-.rail-tender { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.25rem; height:4rem; padding:0.5rem; border-radius:0.5rem; border:1px solid; transition:background-color 150ms; }
-.rail-tender:disabled { opacity:0.4; cursor:not-allowed; }
-.rail-tender > span { font-size:11px; font-weight:500; }
-.rail-tender-kbd { font-size:10px; opacity:0.7; }
-.rail-tender-sm { display:flex; flex-direction:column; align-items:center; justify-content:center; height:3rem; padding:0.25rem 0.5rem; border-radius:0.5rem; border:1px solid; transition:background-color 150ms; }
-.rail-tender-sm:disabled { opacity:0.4; cursor:not-allowed; }
-.rail-tender-sm > span:first-child { font-size:11px; font-weight:500; }
-.rail-tender-hint { font-size:10px; text-transform:uppercase; letter-spacing:0.18em; opacity:0.7; }
-.rail-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; height:3.75rem; padding:0.25rem 0.4rem; border-radius:0.5rem; border:1px solid; transition:background-color 150ms; text-align:center; line-height:1.15; }
-.rail-cell:disabled { opacity:0.4; cursor:not-allowed; }
-.rail-cell > span { font-size:11px; font-weight:500; }
-.rail-cell-hint { font-size:10px; opacity:0.6; }
-.rail-money { display:flex; align-items:center; justify-content:center; height:2.5rem; border-radius:0.5rem; border:1px solid rgb(63 63 70); background:rgb(24 24 27); color:rgb(228 228 231); font-size:12px; font-weight:500; font-variant-numeric:tabular-nums; transition:background-color 150ms; }
-.rail-money:hover { background:rgb(39 39 42); }
-.rail-money:disabled { opacity:0.4; cursor:not-allowed; }
-.rail-emerald { border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.10); color:rgb(110 231 183); }
-.rail-emerald:hover { background:rgba(16, 185, 129, 0.20); }
-.rail-emerald-soft { border-color:rgba(16, 185, 129, 0.30); background:rgba(16, 185, 129, 0.05); color:rgb(110 231 183); }
-.rail-emerald-soft:hover { background:rgba(16, 185, 129, 0.15); }
-.rail-blue { border-color:rgba(59, 130, 246, 0.4); background:rgba(59, 130, 246, 0.10); color:rgb(147 197 253); }
-.rail-blue:hover { background:rgba(59, 130, 246, 0.20); }
-.rail-purple { border-color:rgba(168, 85, 247, 0.4); background:rgba(168, 85, 247, 0.10); color:rgb(216 180 254); }
-.rail-purple:hover { background:rgba(168, 85, 247, 0.20); }
-.rail-amber { border-color:rgba(245, 158, 11, 0.4); background:rgba(245, 158, 11, 0.05); color:rgb(252 211 77); }
-.rail-amber:hover { background:rgba(245, 158, 11, 0.15); }
-.rail-rose { border-color:rgba(244, 63, 94, 0.4); background:rgba(244, 63, 94, 0.05); color:rgb(253 164 175); }
-.rail-rose:hover { background:rgba(244, 63, 94, 0.15); }
-.rail-zinc { border-color:rgb(63 63 70); background:rgba(39, 39, 42, 0.4); color:rgb(212 212 216); }
-.rail-zinc:hover { background:rgb(39 39 42); }
-.rail-zinc-strong { border-color:rgb(82 82 91); background:rgba(39, 39, 42, 0.6); color:rgb(228 228 231); }
-.rail-zinc-strong:hover { background:rgb(39 39 42); }
-.rail-disabled { border-color:rgb(39 39 42); background:rgb(9 9 11); color:rgb(82 82 91); }
+.shortcut { border:1px solid rgb(51 65 85); border-radius:0.25rem; background:rgb(15 23 42); padding:0.05rem 0.35rem; font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:10px; font-weight:500; color:rgb(148 163 184); white-space:nowrap; }
+.qty-button { display:flex; height:1.75rem; width:1.5rem; align-items:center; justify-content:center; border-radius:0.25rem; border:1px solid rgb(51 65 85); background:rgb(15 23 42); color:rgb(203 213 225); }
+.qty-button:hover { border-color:rgb(56 189 248); color:rgb(125 211 252); }
+.top-action { display:flex; height:3rem; align-items:center; gap:0.5rem; border-radius:0.5rem; border:1px solid rgba(56, 189, 248, 0.45); background:rgba(56, 189, 248, 0.10); padding:0 0.9rem; font-size:13px; font-weight:500; color:rgb(125 211 252); }
+.top-action:hover { background:rgba(56, 189, 248, 0.18); }
+.category-tab { flex-shrink:0; border-radius:0.5rem; border:1px solid rgb(51 65 85); background:rgb(17 24 39); padding:0.55rem 0.8rem; font-size:12px; font-weight:500; color:rgb(203 213 225); transition:background-color 150ms, border-color 150ms, color 150ms; }
+.category-tab:hover { border-color:rgb(71 85 105); background:rgb(30 41 59); color:rgb(241 245 249); }
+.category-tab-active { border-color:rgba(56, 189, 248, 0.7); background:rgba(56, 189, 248, 0.12); color:rgb(125 211 252); }
+.product-card { display:flex; min-height:4.4rem; flex-direction:column; justify-content:space-between; gap:0.75rem; border-radius:0.5rem; border:1px solid rgb(51 65 85); background:rgb(17 24 39); padding:0.75rem; text-align:left; transition:background-color 150ms, border-color 150ms; }
+.product-card:hover { border-color:rgba(56, 189, 248, 0.65); background:rgb(30 41 59); }
+.product-card:focus { outline:2px solid rgba(56, 189, 248, 0.5); outline-offset:2px; }
+.control-section { border-radius:0.75rem; border:1px solid rgba(51, 65, 85, 0.9); background:rgba(15, 23, 42, 0.65); padding:0.75rem; }
+.control-heading { margin-bottom:0.55rem; font-size:10px; font-weight:500; letter-spacing:0.22em; text-transform:uppercase; color:rgb(100 116 139); }
+.control-button { display:flex; min-height:2.45rem; align-items:center; justify-content:space-between; gap:0.65rem; border-radius:0.45rem; border:1px solid rgb(51 65 85); background:rgb(17 24 39); padding:0.5rem 0.65rem; text-align:left; font-size:12px; font-weight:500; color:rgb(226 232 240); transition:background-color 150ms, border-color 150ms, color 150ms; }
+.control-button:hover:not(:disabled) { border-color:rgb(71 85 105); background:rgb(30 41 59); }
+.control-button:disabled { cursor:not-allowed; opacity:0.4; }
+.control-primary { border-color:rgba(56, 189, 248, 0.55); background:rgba(56, 189, 248, 0.10); color:rgb(125 211 252); }
+.control-primary:hover:not(:disabled) { background:rgba(56, 189, 248, 0.18); }
+.control-warn { border-color:rgba(251, 191, 36, 0.55); background:rgba(251, 191, 36, 0.10); color:rgb(252 211 77); }
+.control-danger { border-color:rgba(244, 63, 94, 0.5); background:rgba(244, 63, 94, 0.08); color:rgb(253 164 175); }
 </style>
 
 
@@ -470,7 +343,7 @@ import PaymentDialog from '../Components/Pos/PaymentDialog.vue';
 import PinLockOverlay from '../Components/Pos/PinLockOverlay.vue';
 import ProductSearchDialog from '../Components/Pos/ProductSearchDialog.vue';
 import ToastStack from '../Components/Pos/ToastStack.vue';
-import { formatCurrency, roundCurrency, shortTimestamp } from '../utils/formatters';
+import { formatCurrency, roundCurrency } from '../utils/formatters';
 import { useAudioFeedback } from '../composables/pos/useAudioFeedback';
 import { useCart } from '../composables/pos/useCart';
 import { usePosApi } from '../composables/pos/usePosApi';
@@ -610,36 +483,49 @@ useTerminalKeyboard({
     paymentTab,
     quickPay: (method) => quickCheckout(method),
     openDiscount: () => openDiscount(),
+    holdSale,
+    voidLastItem,
+    cancelAll,
+    promptAssignCustomer,
+    promptPriceOverride,
+    promptQuantity,
+    addMiscItem,
+    recordDrawerOpen,
+    recordCashDrop,
+    recordPayout,
+    reprintReceipt,
+    voidLastSalePrompt,
+    openSettings,
 });
 
 // ---- Mock catalog (replaced by API search results when available) ----
 const categories = [
-    { id: 'all', name: 'All', tone: 'slate' },
-    { id: 'hot', name: 'Hot drinks', tone: 'amber' },
-    { id: 'cold', name: 'Cold drinks', tone: 'blue' },
-    { id: 'pastries', name: 'Pastries', tone: 'rose' },
-    { id: 'snacks', name: 'Snacks', tone: 'emerald' },
-    { id: 'household', name: 'Household', tone: 'purple' },
+    { id: 'all', name: 'All' },
+    { id: 'essentials', name: 'Essentials/Unga' },
+    { id: 'dairy', name: 'Dairy/Bread' },
+    { id: 'drinks', name: 'Drinks' },
+    { id: 'deli', name: 'Deli/Snacks' },
+    { id: 'household', name: 'Household' },
 ];
 
 const mockCatalog = [
-    { id: 'm-001', sku: 'HOT-ESP-1', name: 'Espresso',        base_price: 150, category: 'hot',       logo_url: '/logos/espresso.svg' },
-    { id: 'm-002', sku: 'HOT-CAP-1', name: 'Cappuccino',      base_price: 220, category: 'hot',       logo_url: '/logos/cappuccino.svg' },
-    { id: 'm-003', sku: 'HOT-LAT-1', name: 'Latte',           base_price: 250, category: 'hot',       logo_url: '/logos/latte.svg' },
-    { id: 'm-004', sku: 'HOT-AME-1', name: 'Americano',       base_price: 180, category: 'hot',       logo_url: '/logos/americano.svg' },
-    { id: 'm-005', sku: 'HOT-MOC-1', name: 'Mocha',           base_price: 280, category: 'hot',       logo_url: '/logos/mocha.svg' },
-    { id: 'm-010', sku: 'CLD-CKE-1', name: 'Coca-Cola 500ml', base_price: 80,  category: 'cold',      logo_url: '/logos/coca-cola.svg' },
-    { id: 'm-011', sku: 'CLD-FNT-1', name: 'Fanta 500ml',     base_price: 80,  category: 'cold',      logo_url: '/logos/fanta.svg' },
-    { id: 'm-012', sku: 'CLD-WAT-1', name: 'Water 1L',        base_price: 60,  category: 'cold',      logo_url: '/logos/water.svg' },
-    { id: 'm-013', sku: 'CLD-JUI-1', name: 'Mango juice',     base_price: 120, category: 'cold',      logo_url: '/logos/juice.svg' },
-    { id: 'm-014', sku: 'CLD-MLK-1', name: 'Milk 500ml',      base_price: 70,  category: 'cold',      logo_url: '/logos/milk.svg' },
-    { id: 'm-020', sku: 'PAS-CRO-1', name: 'Croissant',       base_price: 180, category: 'pastries',  logo_url: '/logos/croissant.svg' },
-    { id: 'm-021', sku: 'PAS-MUF-1', name: 'Blueberry muffin', base_price: 200, category: 'pastries', logo_url: '/logos/muffin.svg' },
-    { id: 'm-022', sku: 'PAS-DON-1', name: 'Glazed donut',    base_price: 150, category: 'pastries',  logo_url: '/logos/donut.svg' },
-    { id: 'm-023', sku: 'PAS-BRD-1', name: 'White bread',     base_price: 70,  category: 'pastries',  logo_url: '/logos/bread.svg' },
-    { id: 'm-030', sku: 'SNK-CRP-1', name: 'Crisps 50g',      base_price: 90,  category: 'snacks',    logo_url: '/logos/crisps.svg' },
-    { id: 'm-031', sku: 'SNK-NUT-1', name: 'Roasted nuts',    base_price: 220, category: 'snacks',    logo_url: '/logos/nuts.svg' },
-    { id: 'm-032', sku: 'SNK-CHO-1', name: 'Chocolate bar',   base_price: 130, category: 'snacks',    logo_url: '/logos/chocolate.svg' },
+    { id: 'm-001', sku: 'HOT-ESP-1', name: 'Espresso',        base_price: 150, category: 'drinks',    logo_url: '/logos/espresso.svg' },
+    { id: 'm-002', sku: 'HOT-CAP-1', name: 'Cappuccino',      base_price: 220, category: 'drinks',    logo_url: '/logos/cappuccino.svg' },
+    { id: 'm-003', sku: 'HOT-LAT-1', name: 'Latte',           base_price: 250, category: 'drinks',    logo_url: '/logos/latte.svg' },
+    { id: 'm-004', sku: 'HOT-AME-1', name: 'Americano',       base_price: 180, category: 'drinks',    logo_url: '/logos/americano.svg' },
+    { id: 'm-005', sku: 'HOT-MOC-1', name: 'Mocha',           base_price: 280, category: 'drinks',    logo_url: '/logos/mocha.svg' },
+    { id: 'm-010', sku: 'CLD-CKE-1', name: 'Coca-Cola 500ml', base_price: 80,  category: 'drinks',    logo_url: '/logos/coca-cola.svg' },
+    { id: 'm-011', sku: 'CLD-FNT-1', name: 'Fanta 500ml',     base_price: 80,  category: 'drinks',    logo_url: '/logos/fanta.svg' },
+    { id: 'm-012', sku: 'CLD-WAT-1', name: 'Water 1L',        base_price: 60,  category: 'drinks',    logo_url: '/logos/water.svg' },
+    { id: 'm-013', sku: 'CLD-JUI-1', name: 'Mango juice',     base_price: 120, category: 'drinks',    logo_url: '/logos/juice.svg' },
+    { id: 'm-014', sku: 'CLD-MLK-1', name: 'Milk 500ml',      base_price: 70,  category: 'dairy',     logo_url: '/logos/milk.svg' },
+    { id: 'm-020', sku: 'PAS-CRO-1', name: 'Croissant',       base_price: 180, category: 'dairy',     logo_url: '/logos/croissant.svg' },
+    { id: 'm-021', sku: 'PAS-MUF-1', name: 'Blueberry muffin', base_price: 200, category: 'deli',    logo_url: '/logos/muffin.svg' },
+    { id: 'm-022', sku: 'PAS-DON-1', name: 'Glazed donut',    base_price: 150, category: 'deli',      logo_url: '/logos/donut.svg' },
+    { id: 'm-023', sku: 'PAS-BRD-1', name: 'White bread',     base_price: 70,  category: 'dairy',     logo_url: '/logos/bread.svg' },
+    { id: 'm-030', sku: 'SNK-CRP-1', name: 'Crisps 50g',      base_price: 90,  category: 'deli',      logo_url: '/logos/crisps.svg' },
+    { id: 'm-031', sku: 'SNK-NUT-1', name: 'Roasted nuts',    base_price: 220, category: 'deli',      logo_url: '/logos/nuts.svg' },
+    { id: 'm-032', sku: 'SNK-CHO-1', name: 'Chocolate bar',   base_price: 130, category: 'deli',      logo_url: '/logos/chocolate.svg' },
     { id: 'm-040', sku: 'HSE-SOAP-1', name: 'Bar soap',       base_price: 95,  category: 'household', logo_url: '/logos/soap.svg' },
     { id: 'm-041', sku: 'HSE-DET-1',  name: 'Detergent 1kg',  base_price: 350, category: 'household', logo_url: '/logos/detergent.svg' },
 ];
@@ -655,7 +541,7 @@ const visibleProducts = computed(() => {
         return source;
     }
 
-    return source.filter((product) => (product.category ?? 'all') === activeCategoryId.value);
+    return source.filter((product) => categoryKey(product) === activeCategoryId.value);
 });
 
 const resultCountLabel = computed(() => {
@@ -663,70 +549,41 @@ const resultCountLabel = computed(() => {
     return `${count} item${count === 1 ? '' : 's'}`;
 });
 
-const CATEGORY_PALETTE = {
-    hot:        { cardBg: 'bg-amber-500/10 hover:bg-amber-500/15',   iconBg: 'bg-amber-500/20 text-amber-300', text: 'text-amber-100', price: 'text-amber-300/80' },
-    cold:       { cardBg: 'bg-blue-500/10 hover:bg-blue-500/15',     iconBg: 'bg-blue-500/20 text-blue-300',   text: 'text-blue-100',  price: 'text-blue-300/80' },
-    pastries:   { cardBg: 'bg-rose-500/10 hover:bg-rose-500/15',     iconBg: 'bg-rose-500/20 text-rose-300',   text: 'text-rose-100',  price: 'text-rose-300/80' },
-    snacks:     { cardBg: 'bg-emerald-500/10 hover:bg-emerald-500/15', iconBg: 'bg-emerald-500/20 text-emerald-300', text: 'text-emerald-100', price: 'text-emerald-300/80' },
-    household:  { cardBg: 'bg-purple-500/10 hover:bg-purple-500/15', iconBg: 'bg-purple-500/20 text-purple-300', text: 'text-purple-100', price: 'text-purple-300/80' },
-    default:    { cardBg: 'bg-zinc-800/50 hover:bg-zinc-800',         iconBg: 'bg-zinc-800 text-zinc-300',      text: 'text-zinc-100',  price: 'text-zinc-400' },
-};
-
-const CATEGORY_ICON = {
-    hot: Coffee,
-    cold: GlassWater,
-    pastries: Croissant,
-    snacks: Popcorn,
-    household: BuildingStorefrontIcon,
-};
-
-function paletteFor(product) {
-    return CATEGORY_PALETTE[product?.category] ?? CATEGORY_PALETTE.default;
-}
-
-function iconFor(product) {
-    return CATEGORY_ICON[product?.category] ?? CubeIcon;
-}
-
-function categoryLabel(product) {
-    const match = categories.find((category) => category.id === product?.category);
-    return match ? match.name : 'Catalog';
-}
-
 const canCheckout = computed(() => cart.value.length > 0 && !checkoutBusy.value);
 
-const feedItems = computed(() => {
-    const items = [];
+function categoryKey(product) {
+    const category = product?.category?.slug ?? product?.category ?? '';
+    const value = `${category} ${product?.name ?? ''} ${product?.sku ?? ''}`.toLowerCase();
 
-    if (stkStatusMessage.value) {
-        items.push({
-            id: `stk-${stkCheckoutRequestId.value ?? 'pending'}`,
-            message: stkStatusMessage.value,
-            tone: 'info',
-            at: 'STK',
-        });
+    if (value.includes('unga') || value.includes('flour') || value.includes('sugar') || value.includes('rice') || value.includes('beans') || value.includes('essentials') || value.includes('staples')) {
+        return 'essentials';
     }
 
-    livePayments.value.slice(0, 6).forEach((payment) => {
-        items.push({
-            id: `mp-${payment.id ?? payment.transaction_code}`,
-            message: `${payment.transaction_code ?? 'M-Pesa'} · ${formatCurrency(Number(payment.amount ?? 0))}`,
-            tone: 'success',
-            at: shortTimestamp(payment.received_at ?? payment.created_at),
-        });
-    });
+    if (value.includes('milk') || value.includes('bread') || value.includes('dairy') || value.includes('mala') || value.includes('yoghurt')) {
+        return 'dairy';
+    }
 
-    toasts.value.slice(-3).forEach((toastItem) => {
-        items.push({
-            id: `t-${toastItem.id}`,
-            message: `${toastItem.title}: ${toastItem.message}`,
-            tone: toastItem.variant === 'error' ? 'error' : toastItem.variant === 'success' ? 'success' : 'info',
-            at: 'now',
-        });
-    });
+    if (value.includes('drink') || value.includes('water') || value.includes('juice') || value.includes('soda') || value.includes('coke') || value.includes('fanta') || value.includes('coffee') || value.includes('tea')) {
+        return 'drinks';
+    }
 
-    return items.slice(-8).reverse();
-});
+    if (value.includes('snack') || value.includes('deli') || value.includes('crisps') || value.includes('biscuit') || value.includes('muffin') || value.includes('donut') || value.includes('nuts')) {
+        return 'deli';
+    }
+
+    if (value.includes('household') || value.includes('soap') || value.includes('detergent') || value.includes('tissue') || value.includes('cleaner')) {
+        return 'household';
+    }
+
+    return product?.category && categories.some((item) => item.id === product.category) ? product.category : 'all';
+}
+
+function formatKsh(value) {
+    return `Ksh ${new Intl.NumberFormat('en-KE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(Number(value || 0))}`;
+}
 
 function onLogoError(event) {
     const target = event?.target;
@@ -813,16 +670,11 @@ watch(barcode, (value) => {
 onMounted(() => {
     updateClock();
     clockTimer = window.setInterval(updateClock, 1000);
-    liveFeedTimer = window.setInterval(() => {
-        if (currentUser.value && !showPinOverlay.value) {
-            fetchLivePayments();
-        }
-    }, 15000);
 
     window.addEventListener('pos:unauthenticated', handleUnauthenticated);
 
     if (currentUser.value) {
-        fetchLivePayments();
+        ensureOpenShift();
     } else {
         focusPinInput();
     }
@@ -831,10 +683,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
     if (clockTimer) {
         window.clearInterval(clockTimer);
-    }
-
-    if (liveFeedTimer) {
-        window.clearInterval(liveFeedTimer);
     }
 
     stopProductSearch();
@@ -891,7 +739,7 @@ async function loginWithPin() {
         showPinOverlay.value = false;
         toast('Register unlocked', `${response.data.user.name} is now active on the terminal.`, 'success');
         await refreshSharedAuth();
-        fetchLivePayments();
+        await ensureOpenShift();
         focusPriorityInput();
     } catch (error) {
         const message = error?.response?.data?.message ?? 'Unable to unlock the register.';
@@ -927,11 +775,9 @@ async function logout() {
     stopStkPolling();
 
     try {
-        if (currentUser.value) {
-            const response = await posApi.logout();
-            if (response?.data?.csrf_token) {
-                updateCsrfToken(response.data.csrf_token);
-            }
+        const response = await posApi.logout();
+        if (response?.data?.csrf_token) {
+            updateCsrfToken(response.data.csrf_token);
         }
     } catch (error) {
         // Keep the terminal lock-first even if logout request fails.
@@ -942,9 +788,19 @@ async function logout() {
     showSearchModal.value = false;
     showPayModal.value = false;
     newSale(false);
-    toast('Register locked', 'The cashier session has been closed.', 'info');
-    await refreshSharedAuth();
-    focusPinInput();
+    window.location.assign('/');
+}
+
+async function ensureOpenShift() {
+    try {
+        await posApi.openShift(0);
+    } catch (error) {
+        const message = error?.response?.data?.message ?? '';
+
+        if (message !== 'An open shift already exists for this user.') {
+            toast('Shift not opened', message || 'Unable to open a cashier shift.', 'error');
+        }
+    }
 }
 
 function handleUnauthenticated() {
@@ -1355,6 +1211,10 @@ async function voidLastSalePrompt() {
     } catch (error) {
         toast('Void blocked', error?.response?.data?.message ?? 'Unable to void sale.', 'error');
     }
+}
+
+function openSettings() {
+    toast('Settings', 'Settings are available from the owner dashboard.', 'info');
 }
 
 async function tenderExactCash(amount) {

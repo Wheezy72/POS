@@ -11,6 +11,19 @@ export function useTerminalKeyboard({
     paymentTab,
     quickPay,
     openDiscount,
+    holdSale,
+    voidLastItem,
+    cancelAll,
+    promptAssignCustomer,
+    promptPriceOverride,
+    promptQuantity,
+    addMiscItem,
+    recordDrawerOpen,
+    recordCashDrop,
+    recordPayout,
+    reprintReceipt,
+    voidLastSalePrompt,
+    openSettings,
 }) {
     function handleGlobalKeydown(event) {
         if (event.key === 'Escape') {
@@ -64,23 +77,84 @@ export function useTerminalKeyboard({
                 }
                 break;
             case 'F7':
-                if (!creditSalesEnabled.value) {
-                    break;
-                }
-
                 event.preventDefault();
-                openPayModal();
-                paymentTab.value = 'credit';
+                holdSale?.();
                 break;
             case 'F8':
                 event.preventDefault();
-                focusScannerInput(true);
+                openPayModal();
+                break;
+            case 'F9':
+                event.preventDefault();
+                promptAssignCustomer?.();
                 break;
             case 'F10':
                 event.preventDefault();
                 logout();
                 break;
+            case 'F12':
+                event.preventDefault();
+                openSettings?.();
+                break;
+            case 'Delete':
+                event.preventDefault();
+                voidLastItem?.();
+                break;
             default:
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'x') {
+                    event.preventDefault();
+                    cancelAll?.();
+                    return;
+                }
+
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
+                    event.preventDefault();
+                    promptPriceOverride?.();
+                    return;
+                }
+
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'q') {
+                    event.preventDefault();
+                    promptQuantity?.();
+                    return;
+                }
+
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'm') {
+                    event.preventDefault();
+                    addMiscItem?.();
+                    return;
+                }
+
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+                    event.preventDefault();
+                    recordDrawerOpen?.();
+                    return;
+                }
+
+                if (event.altKey && event.key.toLowerCase() === 'd') {
+                    event.preventDefault();
+                    recordCashDrop?.();
+                    return;
+                }
+
+                if (event.altKey && event.key.toLowerCase() === 'p') {
+                    event.preventDefault();
+                    recordPayout?.();
+                    return;
+                }
+
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r') {
+                    event.preventDefault();
+                    reprintReceipt?.();
+                    return;
+                }
+
+                if (event.altKey && event.key.toLowerCase() === 'v') {
+                    event.preventDefault();
+                    voidLastSalePrompt?.();
+                    return;
+                }
+
                 break;
         }
     }
