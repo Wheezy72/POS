@@ -1,8 +1,8 @@
 <template>
     <Head title="POS Terminal" />
 
-    <div class="min-h-screen bg-slate-100 text-slate-900">
-        <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-4 px-4 py-4">
+    <div class="min-h-screen bg-white text-slate-900">
+        <div class="mx-auto flex min-h-screen max-w-[1900px] flex-col gap-2 px-2 py-2">
             <TerminalHeader
                 ref="scannerInput"
                 v-model:barcode="barcode"
@@ -13,8 +13,8 @@
                 @search="searchProducts()"
             />
 
-            <main class="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_13rem]">
-                <section class="grid min-h-0 gap-3">
+            <main class="grid min-h-0 flex-1 gap-2 lg:grid-cols-[minmax(0,1fr)_10.5rem]">
+                <section class="grid min-h-0 gap-2">
                     <CartTable
                         :cart="cart"
                         :effective-unit-price="effectiveUnitPrice"
@@ -27,7 +27,7 @@
                         @remove-item="removeItem"
                     />
 
-                    <section class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                    <section class="grid gap-2 xl:grid-cols-[minmax(0,1fr)_20rem]">
                         <ProductSearchPanel
                             :format-currency="formatCurrency"
                             :search-busy="searchBusy"
