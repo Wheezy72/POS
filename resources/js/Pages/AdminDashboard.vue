@@ -1,31 +1,31 @@
 <template>
     <Head title="Owner Dashboard" />
 
-    <div class="min-h-screen bg-slate-100 text-slate-900">
-        <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8">
-            <header class="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-200 bg-white px-6 py-6 lg:px-8">
+    <div class="min-h-screen bg-zinc-950 text-zinc-100">
+        <div class="mx-auto flex min-h-screen max-w-[1800px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+            <header class="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+                <div class="border-b border-zinc-800 px-6 py-6 lg:px-8">
                     <div class="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
                         <div>
-                            <div class="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.22em] text-slate-500">
-                                <ChartBarIcon class="h-4 w-4" />
+                            <div class="inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-950 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.22em] text-zinc-500">
+                                <ChartBarIcon class="h-3.5 w-3.5" />
                                 Owner analytics
                             </div>
-                            <h1 class="mt-4 text-4xl font-black tracking-tight text-slate-950">Finance and stock command centre</h1>
-                            <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                            <h1 class="mt-4 text-3xl font-medium tracking-tight text-zinc-50 lg:text-4xl">Finance and stock command centre</h1>
+                            <p class="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
                                 Revenue, profit, stock pressure, payment health, and movement signals built for a fast retail shop.
                             </p>
                         </div>
 
                         <div class="grid gap-3 sm:grid-cols-3">
                             <MetricCard label="Session" :value="sessionLabel" :hint="sessionHint">
-                                <ShieldCheckIcon class="h-5 w-5" />
+                                <ShieldCheckIcon class="h-4 w-4" />
                             </MetricCard>
                             <MetricCard label="Month revenue" :value="formatCurrency(kpis.month_revenue)">
-                                <BanknotesIcon class="h-5 w-5" />
+                                <BanknotesIcon class="h-4 w-4" />
                             </MetricCard>
-                            <MetricCard label="Month profit" :value="formatCurrency(kpis.month_profit)" value-class="text-emerald-600" icon-class="bg-emerald-50 text-emerald-700">
-                                <ArrowTrendingUpIcon class="h-5 w-5" />
+                            <MetricCard label="Month profit" :value="formatCurrency(kpis.month_profit)" value-class="text-emerald-300" icon-class="border-emerald-500/40 bg-emerald-500/10 text-emerald-300">
+                                <ArrowTrendingUpIcon class="h-4 w-4" />
                             </MetricCard>
                         </div>
                     </div>
@@ -58,22 +58,22 @@
                 <aside class="grid gap-6 xl:sticky xl:top-6 xl:self-start">
                     <CriticalStockList :items="overview.critical_alerts" :loading="loading" />
 
-                    <section class="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                        <h2 class="text-xl font-black tracking-tight text-slate-950">Practical owner signals</h2>
-                        <div class="mt-6 grid gap-3">
-                            <div class="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Profit intensity</p>
-                                <p class="mt-2 text-2xl font-black text-emerald-600">{{ profitMarginText }}</p>
-                                <p class="mt-2 text-sm leading-6 text-slate-600">Shows whether growth is coming with healthy margin, not just volume.</p>
+                    <section class="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
+                        <h2 class="text-lg font-medium tracking-tight text-zinc-50">Practical owner signals</h2>
+                        <div class="mt-5 grid gap-3">
+                            <div class="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3.5">
+                                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Profit intensity</p>
+                                <p class="mt-2 text-2xl font-medium text-emerald-300 tabular-nums">{{ profitMarginText }}</p>
+                                <p class="mt-2 text-xs leading-5 text-zinc-400">Shows whether growth is coming with healthy margin, not just volume.</p>
                             </div>
-                            <div class="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Runway alerts</p>
-                                <p class="mt-2 text-2xl font-black text-red-600">{{ kpis.critical_alert_count }}</p>
-                                <p class="mt-2 text-sm leading-6 text-slate-600">Prioritise reorders before high-movement goods disappear.</p>
+                            <div class="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3.5">
+                                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Runway alerts</p>
+                                <p class="mt-2 text-2xl font-medium text-rose-300 tabular-nums">{{ kpis.critical_alert_count }}</p>
+                                <p class="mt-2 text-xs leading-5 text-zinc-400">Prioritise reorders before high-movement goods disappear.</p>
                             </div>
-                            <div class="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4">
-                                <p class="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Security posture</p>
-                                <p class="mt-2 text-sm leading-6 text-slate-600">Reports are fetched only after admin session authentication. Charts are bundled locally, not loaded from CDN.</p>
+                            <div class="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3.5">
+                                <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Security posture</p>
+                                <p class="mt-2 text-xs leading-5 text-zinc-400">Reports are fetched only after admin session authentication. Charts are bundled locally, not loaded from CDN.</p>
                             </div>
                         </div>
                     </section>
@@ -101,11 +101,11 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
 import {
-    ArrowTrendingUpIcon,
-    BanknotesIcon,
-    ChartBarIcon,
-    ShieldCheckIcon,
-} from '@heroicons/vue/24/outline';
+    Banknote as BanknotesIcon,
+    BarChart3 as ChartBarIcon,
+    ShieldCheck as ShieldCheckIcon,
+    TrendingUp as ArrowTrendingUpIcon,
+} from 'lucide-vue-next';
 import CriticalStockList from '../Components/Admin/CriticalStockList.vue';
 import LineChartCard from '../Components/Admin/LineChartCard.vue';
 import MetricCard from '../Components/Admin/MetricCard.vue';
@@ -172,15 +172,15 @@ const profitDatasets = computed(() => [
     {
         label: 'Revenue',
         data: overview.value.profit_vs_revenue.revenue,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96, 165, 250, 0.15)',
         tension: 0.35,
     },
     {
         label: 'Profit',
         data: overview.value.profit_vs_revenue.profit,
-        borderColor: '#059669',
-        backgroundColor: 'rgba(5, 150, 105, 0.1)',
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52, 211, 153, 0.15)',
         tension: 0.35,
     },
 ]);
@@ -189,8 +189,8 @@ const hourlyDatasets = computed(() => [
     {
         label: 'Revenue',
         data: overview.value.hourly_heatmap.revenue,
-        borderColor: '#d97706',
-        backgroundColor: 'rgba(217, 119, 6, 0.18)',
+        borderColor: '#fbbf24',
+        backgroundColor: 'rgba(251, 191, 36, 0.2)',
         tension: 0.25,
         fill: true,
     },

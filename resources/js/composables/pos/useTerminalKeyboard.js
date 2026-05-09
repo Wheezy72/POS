@@ -9,6 +9,8 @@ export function useTerminalKeyboard({
     focusScannerInput,
     creditSalesEnabled,
     paymentTab,
+    quickPay,
+    openDiscount,
 }) {
     function handleGlobalKeydown(event) {
         if (event.key === 'Escape') {
@@ -26,9 +28,40 @@ export function useTerminalKeyboard({
                 event.preventDefault();
                 openSearchModal();
                 break;
+            case 'F3':
+                event.preventDefault();
+
+                if (typeof openDiscount === 'function') {
+                    openDiscount();
+                }
+                break;
             case 'F4':
                 event.preventDefault();
-                openPayModal();
+
+                if (typeof quickPay === 'function') {
+                    quickPay('mpesa');
+                } else {
+                    openPayModal();
+                }
+                break;
+            case 'F5':
+                event.preventDefault();
+
+                if (typeof quickPay === 'function') {
+                    quickPay('cash');
+                } else {
+                    openPayModal();
+                    paymentTab.value = 'cash';
+                }
+                break;
+            case 'F6':
+                event.preventDefault();
+
+                if (typeof quickPay === 'function') {
+                    quickPay('card');
+                } else {
+                    openPayModal();
+                }
                 break;
             case 'F7':
                 if (!creditSalesEnabled.value) {

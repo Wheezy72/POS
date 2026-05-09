@@ -8,7 +8,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @inertiaHead
 </head>
-<body class="min-h-screen bg-slate-100 text-slate-900 antialiased">
+<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
     @if (request()->is('pos'))
         <div style="display:none">Unlock the register Staff PIN</div>
     @endif

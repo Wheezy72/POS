@@ -1,72 +1,291 @@
 <template>
     <Head title="POS Terminal" />
 
-    <div class="min-h-screen bg-white text-slate-900">
-        <div class="mx-auto flex min-h-screen max-w-[1900px] flex-col gap-2 px-2 py-2">
-            <TerminalHeader
-                ref="scannerInput"
-                v-model:barcode="barcode"
-                :clock="clock"
-                :current-user="currentUser"
-                :result-count="searchResults.length"
-                :transaction-id="transactionId"
-                @search="searchProducts()"
-            />
+    <div class="flex h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">
+        <!-- LEFT: Cart + Live Feed -->
+        <aside class="flex w-[340px] shrink-0 flex-col border-r border-zinc-800 bg-zinc-900">
+            <header class="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
+                <div>
+                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Register</p>
+                    <p class="mt-0.5 text-sm font-medium text-zinc-100">{{ currentUser?.name ?? 'Locked' }}</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">{{ transactionId }}</p>
+                    <p class="mt-0.5 font-mono text-sm text-zinc-300 tabular-nums">{{ clock }}</p>
+                </div>
+            </header>
 
-            <main class="grid min-h-0 flex-1 gap-2 lg:grid-cols-[minmax(0,1fr)_10.5rem]">
-                <section class="grid min-h-0 gap-2">
-                    <CartTable
-                        :cart="cart"
-                        :effective-unit-price="effectiveUnitPrice"
-                        :format-currency="formatCurrency"
-                        :line-total="lineTotal"
-                        :total-units="totalUnits"
-                        @change-quantity="changeQty"
-                        @normalize-discount="normalizeDiscount"
-                        @normalize-quantity="normalizeQuantity"
-                        @remove-item="removeItem"
-                    />
+            <div class="flex items-center justify-between px-5 py-3 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
+                <span>Cart · {{ totalUnits }} item{{ totalUnits === 1 ? '' : 's' }}</span>
+                <button
+                    v-if="cart.length"
+                    type="button"
+                    class="font-medium text-zinc-400 hover:text-zinc-200"
+                    @click="newSale(true)"
+                >
+                    Clear
+                </button>
+            </div>
 
-                    <section class="grid gap-2 xl:grid-cols-[minmax(0,1fr)_20rem]">
-                        <ProductSearchPanel
-                            :format-currency="formatCurrency"
-                            :search-busy="searchBusy"
-                            :search-results="searchResults"
-                            @open-search="openSearchModal"
-                            @select-product="addProductToCart"
-                        />
+            <div class="flex-1 overflow-y-auto px-3 pb-3">
+                <ul v-if="cart.length" v-auto-animate class="space-y-1.5">
+                    <li
+                        v-for="item in cart"
+                        :key="item.product_id"
+                        class="rounded-lg border border-zinc-800/80 bg-zinc-900 px-3 py-2.5 hover:border-zinc-700"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm text-zinc-100">{{ item.name }}</p>
+                                <p class="mt-0.5 text-xs text-zinc-500">{{ item.sku }}</p>
+                            </div>
+                            <button
+                                type="button"
+                                class="shrink-0 text-zinc-500 hover:text-red-400"
+                                aria-label="Remove item"
+                                @click="removeItem(item.product_id)"
+                            >
+                                <XMarkIcon class="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div class="mt-2 flex items-center justify-between text-xs">
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" class="h-6 w-6 rounded border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100" @click="changeQty(item, -1)">−</button>
+                                <input
+                                    :value="item.quantity"
+                                    inputmode="decimal"
+                                    class="h-6 w-12 rounded border border-zinc-800 bg-zinc-950 px-2 text-center text-zinc-100 outline-none focus:border-blue-500/60 tabular-nums"
+                                    @input="(event) => { item.quantity = Number(event.target.value) || 0 }"
+                                    @change="normalizeQuantity(item)"
+                                >
+                                <button type="button" class="h-6 w-6 rounded border border-zinc-800 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100" @click="changeQty(item, 1)">+</button>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-zinc-400 tabular-nums">{{ formatCurrency(effectiveUnitPrice(item)) }}</p>
+                                <p class="font-medium text-zinc-100 tabular-nums">{{ formatCurrency(lineTotal(item)) }}</p>
+                            </div>
+                        </div>
+                    </li>
+                </ul>
 
-                        <MpesaLiveFeed
-                            :format-currency="formatCurrency"
-                            :live-feed-busy="liveFeedBusy"
-                            :live-payments="livePayments"
-                            :selected-live-payment="selectedLivePayment"
-                            :short-timestamp="shortTimestamp"
-                            @refresh="fetchLivePayments"
-                            @select-payment="selectLivePayment"
-                        />
-                    </section>
-                </section>
+                <div v-else class="mt-12 flex flex-col items-center text-center">
+                    <ShoppingCartIcon class="h-8 w-8 text-zinc-700" />
+                    <p class="mt-3 text-sm text-zinc-400">Cart is empty</p>
+                    <p class="mt-1 text-xs text-zinc-600">Scan a barcode or press F2 to search.</p>
+                </div>
+            </div>
 
-                <PosActionRail
-                    :format-currency="formatCurrency"
-                    :selected-live-payment="selectedLivePayment"
-                    :stk-checkout-request-id="stkCheckoutRequestId"
-                    :stk-status-message="stkStatusMessage"
-                    @logout="logout"
-                    @new-sale="newSale"
-                    @open-pay="openPayModal"
-                    @open-search="openSearchModal"
-                />
-            </main>
+            <!-- Totals -->
+            <div class="border-t border-zinc-800 px-5 py-4">
+                <dl class="space-y-1.5 text-sm">
+                    <div class="flex justify-between text-zinc-400">
+                        <dt>Subtotal</dt>
+                        <dd class="tabular-nums">{{ formatCurrency(subtotal) }}</dd>
+                    </div>
+                    <div class="flex justify-between text-zinc-400">
+                        <dt>Tax</dt>
+                        <dd class="tabular-nums">{{ formatCurrency(tax) }}</dd>
+                    </div>
+                </dl>
+                <div class="mt-3 flex items-baseline justify-between border-t border-zinc-800 pt-3">
+                    <span class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Total</span>
+                    <span class="text-2xl font-medium text-zinc-50 tabular-nums">{{ formatCurrency(grandTotal) }}</span>
+                </div>
+            </div>
 
-            <TotalsFooter
-                :format-currency="formatCurrency"
-                :grand-total="grandTotal"
-                :subtotal="subtotal"
-                :tax="tax"
-            />
-        </div>
+            <!-- Live feed -->
+            <div class="border-t border-zinc-800 bg-zinc-950/40">
+                <div class="flex items-center justify-between px-5 py-2.5">
+                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Live feed</p>
+                    <button
+                        type="button"
+                        class="text-[11px] text-zinc-500 hover:text-zinc-300"
+                        :disabled="liveFeedBusy"
+                        @click="fetchLivePayments"
+                    >
+                        {{ liveFeedBusy ? 'Refreshing…' : 'Refresh' }}
+                    </button>
+                </div>
+                <ul class="max-h-44 overflow-y-auto px-3 pb-3">
+                    <li
+                        v-for="event in feedItems"
+                        :key="event.id"
+                        class="flex items-start gap-2.5 rounded px-2 py-1.5 text-xs hover:bg-zinc-900"
+                        :class="event.tone === 'error' ? 'text-red-300' : event.tone === 'success' ? 'text-emerald-300' : 'text-zinc-400'"
+                    >
+                        <span class="mt-1 h-1.5 w-1.5 shrink-0 rounded-full" :class="event.tone === 'error' ? 'bg-red-500' : event.tone === 'success' ? 'bg-emerald-500' : 'bg-zinc-600'" />
+                        <div class="min-w-0">
+                            <p class="truncate">{{ event.message }}</p>
+                            <p class="mt-0.5 text-[10px] uppercase tracking-[0.2em] text-zinc-600">{{ event.at }}</p>
+                        </div>
+                    </li>
+                    <li v-if="!feedItems.length" class="px-2 py-1.5 text-xs text-zinc-600">No activity yet.</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- CENTER: Search + Product Grid -->
+        <main class="flex min-w-0 flex-1 flex-col gap-4 p-4">
+            <div class="flex items-center gap-3">
+                <div class="relative flex-1">
+                    <BarcodeIcon class="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
+                    <input
+                        ref="scannerInput"
+                        v-model="barcode"
+                        type="text"
+                        autocomplete="off"
+                        spellcheck="false"
+                        placeholder="Scan barcode or type to search products"
+                        class="h-11 w-full rounded-lg border border-zinc-800 bg-zinc-900 pl-10 pr-32 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/30"
+                        @keydown.enter.prevent="searchProducts()"
+                    >
+                    <kbd class="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-zinc-800 bg-zinc-950 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500">Enter</kbd>
+                </div>
+                <span class="hidden text-[11px] uppercase tracking-[0.22em] text-zinc-500 lg:inline">{{ resultCountLabel }}</span>
+            </div>
+
+            <div class="-mx-1 flex shrink-0 gap-2 overflow-x-auto px-1 pb-1">
+                <button
+                    v-for="category in categories"
+                    :key="category.id"
+                    type="button"
+                    class="shrink-0 rounded-full border px-3.5 py-1.5 text-xs transition"
+                    :class="activeCategoryId === category.id
+                        ? 'border-zinc-100 bg-zinc-100 text-zinc-950'
+                        : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:border-zinc-700 hover:text-zinc-100'"
+                    @click="activeCategoryId = category.id"
+                >
+                    {{ category.name }}
+                </button>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/30 p-3">
+                <div v-if="searchBusy" class="px-1 pb-2 text-xs text-zinc-500">Searching…</div>
+
+                <div v-if="visibleProducts.length" class="grid grid-cols-3 gap-4 xl:grid-cols-4 2xl:grid-cols-5">
+                    <button
+                        v-for="product in visibleProducts"
+                        :key="product.id"
+                        type="button"
+                        class="group relative flex aspect-square flex-col items-center justify-between overflow-hidden rounded-2xl border border-zinc-800/80 p-4 text-center transition hover:border-zinc-600 hover:shadow-lg hover:shadow-black/40 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        :class="paletteFor(product).cardBg"
+                        @click="addProductToCart(product)"
+                    >
+                        <span class="text-[10px] font-medium uppercase tracking-[0.22em] opacity-70" :class="paletteFor(product).text">
+                            {{ categoryLabel(product) }}
+                        </span>
+                        <span
+                            class="flex h-14 w-14 items-center justify-center rounded-2xl shadow-inner shadow-black/20"
+                            :class="paletteFor(product).iconBg"
+                        >
+                            <component :is="iconFor(product)" class="h-7 w-7" />
+                        </span>
+                        <div class="w-full">
+                            <p class="truncate text-base font-medium" :class="paletteFor(product).text">{{ product.name }}</p>
+                            <p class="mt-1 text-sm font-medium tabular-nums" :class="paletteFor(product).price">{{ formatCurrency(Number(product.base_price)) }}</p>
+                        </div>
+                    </button>
+                </div>
+
+                <div v-else class="flex h-full flex-col items-center justify-center text-center">
+                    <MagnifyingGlassIcon class="h-8 w-8 text-zinc-700" />
+                    <p class="mt-3 text-sm text-zinc-400">No products match.</p>
+                    <p class="mt-1 text-xs text-zinc-600">Try a different category or clear the search.</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT: Action rail (KBAM-friendly, touchscreen aesthetic) -->
+        <aside class="flex w-[240px] shrink-0 flex-col gap-3 border-l border-zinc-800 bg-zinc-900 p-4">
+            <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Tender</p>
+
+            <button
+                type="button"
+                class="flex h-14 items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/5 px-4 text-left text-emerald-300 transition hover:bg-emerald-500/15 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!canCheckout"
+                @click="quickCheckout('mpesa')"
+            >
+                <DevicePhoneMobileIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium tracking-wide">Pay · M-Pesa</span>
+                <kbd class="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-200">F4</kbd>
+            </button>
+            <button
+                type="button"
+                class="flex h-14 items-center gap-3 rounded-xl border border-blue-500/40 bg-blue-500/5 px-4 text-left text-blue-300 transition hover:bg-blue-500/15 focus:outline-none focus:ring-2 focus:ring-blue-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!canCheckout"
+                @click="quickCheckout('cash')"
+            >
+                <BanknotesIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium tracking-wide">Pay · Cash</span>
+                <kbd class="rounded border border-blue-500/40 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] text-blue-200">F5</kbd>
+            </button>
+            <button
+                type="button"
+                class="flex h-14 items-center gap-3 rounded-xl border border-purple-500/40 bg-purple-500/5 px-4 text-left text-purple-300 transition hover:bg-purple-500/15 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!canCheckout"
+                @click="quickCheckout('card')"
+            >
+                <CreditCardIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium tracking-wide">Pay · Card</span>
+                <kbd class="rounded border border-purple-500/40 bg-purple-500/10 px-1.5 py-0.5 font-mono text-[10px] text-purple-200">F6</kbd>
+            </button>
+
+            <div class="my-1 h-px bg-zinc-800" />
+
+            <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Actions</p>
+
+            <button
+                type="button"
+                class="flex h-12 items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 text-left text-amber-300 transition hover:bg-amber-500/15 focus:outline-none focus:ring-2 focus:ring-amber-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                @click="openDiscount"
+            >
+                <TagIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium">Discount</span>
+                <kbd class="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-200">F3</kbd>
+            </button>
+            <button
+                type="button"
+                class="flex h-12 items-center gap-3 rounded-xl border border-rose-500/40 bg-rose-500/5 px-4 text-left text-rose-300 transition hover:bg-rose-500/15 focus:outline-none focus:ring-2 focus:ring-rose-400/60 disabled:cursor-not-allowed disabled:opacity-40"
+                :disabled="!cart.length"
+                @click="voidLastItem"
+            >
+                <NoSymbolIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium">Void item</span>
+            </button>
+            <button
+                type="button"
+                class="flex h-12 items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800/40 px-4 text-left text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                @click="openSearchModal"
+            >
+                <MagnifyingGlassIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium">Search</span>
+                <kbd class="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">F2</kbd>
+            </button>
+            <button
+                type="button"
+                class="flex h-12 items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800/40 px-4 text-left text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                @click="newSale(true)"
+            >
+                <ArrowPathIcon class="h-5 w-5" />
+                <span class="flex-1 text-sm font-medium">New sale</span>
+                <kbd class="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">F1</kbd>
+            </button>
+
+            <div class="mt-auto space-y-3 border-t border-zinc-800 pt-3">
+                <div v-if="stkStatusMessage" class="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-400">
+                    {{ stkStatusMessage }}
+                </div>
+                <button
+                    type="button"
+                    class="flex h-12 w-full items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800/40 px-4 text-left text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
+                    @click="logout"
+                >
+                    <LockClosedIcon class="h-5 w-5" />
+                    <span class="flex-1 text-sm font-medium">Lock</span>
+                    <kbd class="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">F10</kbd>
+                </button>
+            </div>
+        </aside>
 
         <ToastStack :toasts="toasts" />
 
@@ -122,19 +341,34 @@
     </div>
 </template>
 
+
+
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Head, usePage } from '@inertiajs/vue3';
-import CartTable from '../Components/Pos/CartTable.vue';
-import MpesaLiveFeed from '../Components/Pos/MpesaLiveFeed.vue';
+import {
+    Ban as NoSymbolIcon,
+    Banknote as BanknotesIcon,
+    Coffee,
+    CreditCard as CreditCardIcon,
+    Croissant,
+    GlassWater,
+    Lock as LockClosedIcon,
+    Package as CubeIcon,
+    Popcorn,
+    RefreshCw as ArrowPathIcon,
+    ScanBarcode as BarcodeIcon,
+    Search as MagnifyingGlassIcon,
+    ShoppingBag as BuildingStorefrontIcon,
+    ShoppingCart as ShoppingCartIcon,
+    Smartphone as DevicePhoneMobileIcon,
+    Tag as TagIcon,
+    X as XMarkIcon,
+} from 'lucide-vue-next';
 import PaymentDialog from '../Components/Pos/PaymentDialog.vue';
 import PinLockOverlay from '../Components/Pos/PinLockOverlay.vue';
-import PosActionRail from '../Components/Pos/PosActionRail.vue';
 import ProductSearchDialog from '../Components/Pos/ProductSearchDialog.vue';
-import ProductSearchPanel from '../Components/Pos/ProductSearchPanel.vue';
-import TerminalHeader from '../Components/Pos/TerminalHeader.vue';
 import ToastStack from '../Components/Pos/ToastStack.vue';
-import TotalsFooter from '../Components/Pos/TotalsFooter.vue';
 import { formatCurrency, roundCurrency, shortTimestamp } from '../utils/formatters';
 import { useAudioFeedback } from '../composables/pos/useAudioFeedback';
 import { useCart } from '../composables/pos/useCart';
@@ -268,7 +502,166 @@ useTerminalKeyboard({
     focusScannerInput,
     creditSalesEnabled,
     paymentTab,
+    quickPay: (method) => quickCheckout(method),
+    openDiscount: () => openDiscount(),
 });
+
+// ---- Mock catalog (replaced by API search results when available) ----
+const categories = [
+    { id: 'all', name: 'All', tone: 'slate' },
+    { id: 'hot', name: 'Hot drinks', tone: 'amber' },
+    { id: 'cold', name: 'Cold drinks', tone: 'blue' },
+    { id: 'pastries', name: 'Pastries', tone: 'rose' },
+    { id: 'snacks', name: 'Snacks', tone: 'emerald' },
+    { id: 'household', name: 'Household', tone: 'purple' },
+];
+
+const mockCatalog = [
+    { id: 'm-001', sku: 'HOT-ESP-1', name: 'Espresso',        base_price: 150, category: 'hot' },
+    { id: 'm-002', sku: 'HOT-CAP-1', name: 'Cappuccino',      base_price: 220, category: 'hot' },
+    { id: 'm-003', sku: 'HOT-LAT-1', name: 'Latte',           base_price: 250, category: 'hot' },
+    { id: 'm-004', sku: 'HOT-AME-1', name: 'Americano',       base_price: 180, category: 'hot' },
+    { id: 'm-005', sku: 'HOT-MOC-1', name: 'Mocha',           base_price: 280, category: 'hot' },
+    { id: 'm-010', sku: 'CLD-CKE-1', name: 'Coca-Cola 500ml', base_price: 80,  category: 'cold' },
+    { id: 'm-011', sku: 'CLD-FNT-1', name: 'Fanta 500ml',     base_price: 80,  category: 'cold' },
+    { id: 'm-012', sku: 'CLD-WAT-1', name: 'Water 1L',        base_price: 60,  category: 'cold' },
+    { id: 'm-013', sku: 'CLD-JUI-1', name: 'Mango juice',     base_price: 120, category: 'cold' },
+    { id: 'm-020', sku: 'PAS-CRO-1', name: 'Croissant',       base_price: 180, category: 'pastries' },
+    { id: 'm-021', sku: 'PAS-MUF-1', name: 'Blueberry muffin', base_price: 200, category: 'pastries' },
+    { id: 'm-022', sku: 'PAS-DON-1', name: 'Glazed donut',    base_price: 150, category: 'pastries' },
+    { id: 'm-030', sku: 'SNK-CRP-1', name: 'Crisps 50g',      base_price: 90,  category: 'snacks' },
+    { id: 'm-031', sku: 'SNK-NUT-1', name: 'Roasted nuts',    base_price: 220, category: 'snacks' },
+    { id: 'm-032', sku: 'SNK-CHO-1', name: 'Chocolate bar',   base_price: 130, category: 'snacks' },
+    { id: 'm-040', sku: 'HSE-SOAP-1', name: 'Bar soap',       base_price: 95,  category: 'household' },
+    { id: 'm-041', sku: 'HSE-DET-1',  name: 'Detergent 1kg',  base_price: 350, category: 'household' },
+];
+
+const activeCategoryId = ref('all');
+
+const visibleProducts = computed(() => {
+    const fromSearch = Array.isArray(searchResults?.value) ? searchResults.value : [];
+    const haveSearchResults = fromSearch.length > 0;
+    const source = haveSearchResults ? fromSearch : mockCatalog;
+
+    if (activeCategoryId.value === 'all') {
+        return source;
+    }
+
+    return source.filter((product) => (product.category ?? 'all') === activeCategoryId.value);
+});
+
+const resultCountLabel = computed(() => {
+    const count = visibleProducts.value.length;
+    return `${count} item${count === 1 ? '' : 's'}`;
+});
+
+const CATEGORY_PALETTE = {
+    hot:        { cardBg: 'bg-amber-500/10 hover:bg-amber-500/15',   iconBg: 'bg-amber-500/20 text-amber-300', text: 'text-amber-100', price: 'text-amber-300/80' },
+    cold:       { cardBg: 'bg-blue-500/10 hover:bg-blue-500/15',     iconBg: 'bg-blue-500/20 text-blue-300',   text: 'text-blue-100',  price: 'text-blue-300/80' },
+    pastries:   { cardBg: 'bg-rose-500/10 hover:bg-rose-500/15',     iconBg: 'bg-rose-500/20 text-rose-300',   text: 'text-rose-100',  price: 'text-rose-300/80' },
+    snacks:     { cardBg: 'bg-emerald-500/10 hover:bg-emerald-500/15', iconBg: 'bg-emerald-500/20 text-emerald-300', text: 'text-emerald-100', price: 'text-emerald-300/80' },
+    household:  { cardBg: 'bg-purple-500/10 hover:bg-purple-500/15', iconBg: 'bg-purple-500/20 text-purple-300', text: 'text-purple-100', price: 'text-purple-300/80' },
+    default:    { cardBg: 'bg-zinc-800/50 hover:bg-zinc-800',         iconBg: 'bg-zinc-800 text-zinc-300',      text: 'text-zinc-100',  price: 'text-zinc-400' },
+};
+
+const CATEGORY_ICON = {
+    hot: Coffee,
+    cold: GlassWater,
+    pastries: Croissant,
+    snacks: Popcorn,
+    household: BuildingStorefrontIcon,
+};
+
+function paletteFor(product) {
+    return CATEGORY_PALETTE[product?.category] ?? CATEGORY_PALETTE.default;
+}
+
+function iconFor(product) {
+    return CATEGORY_ICON[product?.category] ?? CubeIcon;
+}
+
+function categoryLabel(product) {
+    const match = categories.find((category) => category.id === product?.category);
+    return match ? match.name : 'Catalog';
+}
+
+const canCheckout = computed(() => cart.value.length > 0 && !checkoutBusy.value);
+
+const feedItems = computed(() => {
+    const items = [];
+
+    if (stkStatusMessage.value) {
+        items.push({
+            id: `stk-${stkCheckoutRequestId.value ?? 'pending'}`,
+            message: stkStatusMessage.value,
+            tone: 'info',
+            at: 'STK',
+        });
+    }
+
+    livePayments.value.slice(0, 6).forEach((payment) => {
+        items.push({
+            id: `mp-${payment.id ?? payment.transaction_code}`,
+            message: `${payment.transaction_code ?? 'M-Pesa'} · ${formatCurrency(Number(payment.amount ?? 0))}`,
+            tone: 'success',
+            at: shortTimestamp(payment.received_at ?? payment.created_at),
+        });
+    });
+
+    toasts.value.slice(-3).forEach((toastItem) => {
+        items.push({
+            id: `t-${toastItem.id}`,
+            message: `${toastItem.title}: ${toastItem.message}`,
+            tone: toastItem.variant === 'error' ? 'error' : toastItem.variant === 'success' ? 'success' : 'info',
+            at: 'now',
+        });
+    });
+
+    return items.slice(-8).reverse();
+});
+
+function quickCheckout(method) {
+    if (!canCheckout.value) {
+        toast('Cart empty', 'Add at least one item before taking payment.', 'error');
+        return;
+    }
+
+    paymentTab.value = method === 'card' ? 'cash' : method === 'mpesa' ? 'stk' : 'cash';
+    showPayModal.value = true;
+
+    if (method === 'mpesa') {
+        fetchLivePayments();
+    }
+}
+
+function openDiscount() {
+    if (!cart.value.length) {
+        toast('Nothing to discount', 'Add an item before applying a discount.', 'error');
+        return;
+    }
+
+    const last = cart.value[cart.value.length - 1];
+    const input = window.prompt(`Discount per unit for ${last.name} (max ${formatCurrency(last.base_price - 0.01)}):`, String(last.discount ?? 0));
+
+    if (input === null) {
+        return;
+    }
+
+    last.discount = Number(input) || 0;
+    normalizeDiscount(last);
+    toast('Discount applied', `${last.name}: ${formatCurrency(last.discount)} off per unit.`, 'success');
+}
+
+function voidLastItem() {
+    const last = cart.value[cart.value.length - 1];
+
+    if (!last) {
+        return;
+    }
+
+    removeItem(last.product_id);
+    toast('Item voided', `${last.name} removed from cart.`, 'info');
+}
 
 watch([showSearchModal, showPayModal, showPinOverlay], async () => {
     await nextTick();
