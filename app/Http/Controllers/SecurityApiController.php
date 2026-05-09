@@ -26,6 +26,15 @@ class SecurityApiController extends Controller
         return $this->authenticatePinLogin($request);
     }
 
+    public function adminPinLogin(Request $request): JsonResponse
+    {
+        return $this->authenticatePinLogin(
+            $request,
+            ['admin'],
+            'Only admin accounts can open the owner dashboard.'
+        );
+    }
+
     public function posPinLogin(Request $request): JsonResponse
     {
         return $this->authenticatePinLogin(

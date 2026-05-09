@@ -93,9 +93,12 @@
             v-model:pin="pin"
             :blocked-role="blockedRole"
             :busy="pinBusy"
+            context="admin"
             :heading="overlayHeading"
+            help-text="Enter a valid admin PIN to continue."
             :label="overlayLabel"
             :show="!isAdmin"
+            submit-label="Unlock dashboard"
             @submit="loginWithPin"
         />
 
@@ -236,7 +239,7 @@ async function loginWithPin() {
     pinBusy.value = true;
 
     try {
-        const response = await window.axios.post('/api/auth/pin-login', {
+        const response = await window.axios.post('/api/auth/admin-pin-login', {
             pin: pin.value,
         });
 

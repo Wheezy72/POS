@@ -17,6 +17,7 @@ Route::get('/pos', fn () => Inertia::render('PosTerminal', [
     'overlayHeading' => 'Unlock the register',
     'overlayLabel' => 'Staff PIN',
 ]))->middleware('app.configured');
+Route::redirect('/admin', '/dashboard')->middleware('app.configured');
 Route::get('/dashboard', fn () => Inertia::render('AdminDashboard', [
     'overlayHeading' => 'Unlock the admin dashboard',
     'overlayLabel' => 'Admin PIN',
@@ -38,7 +39,10 @@ Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin'])
     ->middleware('throttle:5,10');
 
 Route::prefix('api/auth')->group(function (): void {
+    Route::get('/me', [SecurityApiController::class, 'me']);
     Route::post('/pin-login', [SecurityApiController::class, 'pinLogin'])
+        ->middleware('throttle:5,10');
+    Route::post('/admin-pin-login', [SecurityApiController::class, 'adminPinLogin'])
         ->middleware('throttle:5,10');
 });
 

@@ -32,7 +32,7 @@
                             Open terminal
                         </a>
                         <a
-                            href="/admin"
+                            href="/dashboard"
                             class="inline-flex items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900 px-6 py-3.5 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800"
                         >
                             Open admin
