@@ -12,7 +12,7 @@
             </div>
 
             <p v-if="blockedRole" class="mt-4 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-                Logged-in role "{{ blockedRole }}" cannot operate the cashier terminal.
+                {{ blockedMessage }}
             </p>
 
             <label class="mt-5 block text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">{{ label }}</label>
@@ -29,21 +29,21 @@
             >
 
             <button class="mt-5 flex w-full items-center justify-between rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-3.5 text-left text-sm font-medium uppercase tracking-[0.18em] text-emerald-300 transition hover:bg-emerald-500/25 disabled:cursor-not-allowed disabled:opacity-50" :disabled="busy" @click="$emit('submit')">
-                <span>{{ busy ? 'Unlocking…' : 'Unlock register' }}</span>
+                <span>{{ busy ? 'Unlocking…' : submitLabel }}</span>
                 <ArrowPathIcon v-if="busy" class="h-5 w-5 animate-spin" />
                 <KeyIcon v-else class="h-5 w-5" />
             </button>
 
-            <p class="mt-4 text-xs text-zinc-500">Enter a valid staff PIN to continue.</p>
+            <p class="mt-4 text-xs text-zinc-500">{{ helpText }}</p>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { RefreshCw as ArrowPathIcon, Key as KeyIcon, Lock as LockClosedIcon } from 'lucide-vue-next';
 
-defineProps({
+const props = defineProps({
     show: {
         type: Boolean,
         required: true,
@@ -68,6 +68,18 @@ defineProps({
         type: Boolean,
         required: true,
     },
+    context: {
+        type: String,
+        default: 'register',
+    },
+    submitLabel: {
+        type: String,
+        default: 'Unlock register',
+    },
+    helpText: {
+        type: String,
+        default: 'Enter a valid staff PIN to continue.',
+    },
 });
 
 defineEmits([
@@ -76,6 +88,11 @@ defineEmits([
 ]);
 
 const pinInput = ref(null);
+const blockedMessage = computed(() => {
+    const target = props.context === 'admin' ? 'the owner dashboard' : 'the cashier terminal';
+
+    return `Logged-in role "${props.blockedRole}" cannot operate ${target}.`;
+});
 
 defineExpose({
     focus() {

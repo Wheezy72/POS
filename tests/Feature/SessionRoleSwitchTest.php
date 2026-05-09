@@ -67,6 +67,27 @@ class SessionRoleSwitchTest extends TestCase
         $this->getJson('/api/auth/me')->assertJson(['user' => ['role' => 'admin']]);
     }
 
+    public function test_admin_dashboard_pin_login_rejects_cashier_without_replacing_session(): void
+    {
+        User::query()->create([
+            'name' => 'Counter',
+            'email' => 'counter@example.com',
+            'password' => 'secret-password',
+            'pin' => '0000',
+            'role' => 'cashier',
+        ]);
+
+        $this->postJson('/api/login-pin', ['pin' => '0000'])->assertOk();
+
+        $response = $this->postJson('/api/auth/admin-pin-login', ['pin' => '0000']);
+
+        $response->assertForbidden();
+        $response->assertJson([
+            'message' => 'Only admin accounts can open the owner dashboard.',
+        ]);
+        $this->getJson('/api/auth/me')->assertJson(['user' => ['role' => 'cashier']]);
+    }
+
     public function test_logout_returns_csrf_token_and_clears_session(): void
     {
         User::query()->create([
