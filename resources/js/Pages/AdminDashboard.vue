@@ -15,6 +15,12 @@
                             <p class="mt-3 max-w-3xl text-sm leading-6 text-zinc-400">
                                 Revenue, profit, stock pressure, payment health, and movement signals built for a fast retail shop.
                             </p>
+                            <div v-if="isAdmin" class="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-400">
+                                <span class="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-0.5 text-emerald-300">Signed in as {{ currentUser?.name }}</span>
+                                <button type="button" class="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1 text-[11px] font-medium text-zinc-300 hover:bg-zinc-800" @click="adminLogout">
+                                    <LockClosedIcon class="h-3.5 w-3.5" /> Lock dashboard
+                                </button>
+                            </div>
                         </div>
 
                         <div class="grid gap-3 sm:grid-cols-3">
@@ -99,10 +105,11 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import {
     Banknote as BanknotesIcon,
     BarChart3 as ChartBarIcon,
+    Lock as LockClosedIcon,
     ShieldCheck as ShieldCheckIcon,
     TrendingUp as ArrowTrendingUpIcon,
 } from 'lucide-vue-next';
@@ -243,6 +250,7 @@ async function loginWithPin() {
         updateCsrfToken(response.data.csrf_token);
         pin.value = '';
         toast('Dashboard unlocked', `${response.data.user.name} can now view owner insights.`, 'success');
+        await refreshSharedAuth();
         await fetchOverview();
     } catch (requestError) {
         toast('Access denied', requestError?.response?.data?.message ?? 'Unable to unlock the dashboard.', 'error');
@@ -250,6 +258,43 @@ async function loginWithPin() {
     } finally {
         pinBusy.value = false;
     }
+}
+
+async function refreshSharedAuth() {
+    try {
+        const response = await window.axios.get('/api/auth/me');
+        if (response.data?.csrf_token) {
+            updateCsrfToken(response.data.csrf_token);
+        }
+        if (!response.data?.authenticated) {
+            currentUser.value = null;
+        } else if (response.data.user?.role !== 'admin') {
+            currentUser.value = response.data.user;
+        }
+    } catch (error) {
+        // best-effort
+    }
+
+    try {
+        await router.reload({ only: ['auth', 'csrfToken'], preserveScroll: true, preserveState: true });
+    } catch (error) {
+        // best-effort
+    }
+}
+
+async function adminLogout() {
+    try {
+        const response = await window.axios.post('/api/logout');
+        if (response?.data?.csrf_token) {
+            updateCsrfToken(response.data.csrf_token);
+        }
+    } catch (error) {
+        // ignore network errors; still drop client state
+    }
+    currentUser.value = null;
+    toast('Dashboard locked', 'Admin session has been ended.', 'info');
+    await refreshSharedAuth();
+    nextTick(() => pinInput.value?.focus?.());
 }
 
 function updateCsrfToken(token) {

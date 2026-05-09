@@ -38,6 +38,7 @@ Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin']);
 
 Route::prefix('api/auth')->group(function (): void {
     Route::post('/pin-login', [SecurityApiController::class, 'pinLogin']);
+    Route::get('/me', [SecurityApiController::class, 'me']);
 });
 
 Route::middleware('auth')->group(function (): void {

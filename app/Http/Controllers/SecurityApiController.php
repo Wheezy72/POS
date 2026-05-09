@@ -303,6 +303,29 @@ class SecurityApiController extends Controller
         ], 201);
     }
 
+    public function me(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return response()->json([
+                'authenticated' => false,
+                'user' => null,
+                'csrf_token' => $request->session()->token(),
+            ]);
+        }
+
+        return response()->json([
+            'authenticated' => true,
+            'user' => [
+                'id' => (string) $user->getAuthIdentifier(),
+                'name' => $user->name,
+                'role' => $user->role,
+            ],
+            'csrf_token' => $request->session()->token(),
+        ]);
+    }
+
     public function logout(Request $request): JsonResponse
     {
         Auth::guard('web')->logout();
@@ -311,6 +334,7 @@ class SecurityApiController extends Controller
 
         return response()->json([
             'message' => 'Logged out successfully.',
+            'csrf_token' => $request->session()->token(),
         ]);
     }
 

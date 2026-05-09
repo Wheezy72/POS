@@ -175,10 +175,12 @@
                             {{ categoryLabel(product) }}
                         </span>
                         <span
-                            class="flex h-14 w-14 items-center justify-center rounded-2xl shadow-inner shadow-black/20"
+                            class="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white/5 shadow-inner shadow-black/20 ring-1 ring-white/10"
                             :class="paletteFor(product).iconBg"
                         >
-                            <component :is="iconFor(product)" class="h-7 w-7" />
+                            <img v-if="product.logo_url" :src="product.logo_url" :alt="product.name" class="h-12 w-12 object-contain" loading="lazy" @error="onLogoError($event)" />
+                            <component :is="iconFor(product)" v-else class="h-7 w-7" />
+                            <component :is="iconFor(product)" class="logo-fallback hidden h-7 w-7" />
                         </span>
                         <div class="w-full">
                             <p class="truncate text-base font-medium" :class="paletteFor(product).text">{{ product.name }}</p>
@@ -195,96 +197,150 @@
             </div>
         </main>
 
-        <!-- RIGHT: Action rail (KBAM-friendly, touchscreen aesthetic) -->
-        <aside class="flex w-[240px] shrink-0 flex-col gap-3 border-l border-zinc-800 bg-zinc-900 p-4">
-            <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Tender</p>
+        <!-- RIGHT: SambaPOS-style grouped function stack (KBAM-first) -->
+        <aside class="flex w-[360px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-zinc-800 bg-zinc-900 p-3">
+            <!-- Tender shortcuts -->
+            <section>
+                <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Tender</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" class="rail-tender rail-emerald" :disabled="!canCheckout" @click="quickCheckout('mpesa')">
+                        <DevicePhoneMobileIcon class="h-5 w-5" />
+                        <span>M-Pesa <span class="rail-tender-kbd">F4</span></span>
+                    </button>
+                    <button type="button" class="rail-tender rail-blue" :disabled="!canCheckout" @click="quickCheckout('cash')">
+                        <BanknotesIcon class="h-5 w-5" />
+                        <span>Cash <span class="rail-tender-kbd">F5</span></span>
+                    </button>
+                    <button type="button" class="rail-tender rail-purple" :disabled="!canCheckout" @click="quickCheckout('card')">
+                        <CreditCardIcon class="h-5 w-5" />
+                        <span>Card <span class="rail-tender-kbd">F6</span></span>
+                    </button>
+                </div>
+                <div class="mt-2 grid grid-cols-3 gap-2">
+                    <button type="button" class="rail-tender-sm rail-emerald-soft" :disabled="!canCheckout" @click="openLiveFeedTender">
+                        <span>Live feed</span>
+                        <span class="rail-tender-hint">M-Pesa C2B</span>
+                    </button>
+                    <button type="button" class="rail-tender-sm" :class="creditSalesEnabled ? 'rail-amber' : 'rail-disabled'" :disabled="!creditSalesEnabled || !canCheckout" @click="openCreditTender">
+                        <span>Credit · F7</span>
+                        <span class="rail-tender-hint">{{ creditSalesEnabled ? 'IOU' : 'Disabled' }}</span>
+                    </button>
+                    <button type="button" class="rail-tender-sm rail-zinc-strong" :disabled="!canCheckout" @click="openPayModal">
+                        <span>Split · pay</span>
+                        <span class="rail-tender-hint">choose tender</span>
+                    </button>
+                </div>
+            </section>
 
-            <button
-                type="button"
-                class="flex h-14 items-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-500/5 px-4 text-left text-emerald-300 transition hover:bg-emerald-500/15 focus:outline-none focus:ring-2 focus:ring-emerald-400/60 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!canCheckout"
-                @click="quickCheckout('mpesa')"
-            >
-                <DevicePhoneMobileIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium tracking-wide">Pay · M-Pesa</span>
-                <kbd class="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-200">F4</kbd>
-            </button>
-            <button
-                type="button"
-                class="flex h-14 items-center gap-3 rounded-xl border border-blue-500/40 bg-blue-500/5 px-4 text-left text-blue-300 transition hover:bg-blue-500/15 focus:outline-none focus:ring-2 focus:ring-blue-400/60 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!canCheckout"
-                @click="quickCheckout('cash')"
-            >
-                <BanknotesIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium tracking-wide">Pay · Cash</span>
-                <kbd class="rounded border border-blue-500/40 bg-blue-500/10 px-1.5 py-0.5 font-mono text-[10px] text-blue-200">F5</kbd>
-            </button>
-            <button
-                type="button"
-                class="flex h-14 items-center gap-3 rounded-xl border border-purple-500/40 bg-purple-500/5 px-4 text-left text-purple-300 transition hover:bg-purple-500/15 focus:outline-none focus:ring-2 focus:ring-purple-400/60 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!canCheckout"
-                @click="quickCheckout('card')"
-            >
-                <CreditCardIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium tracking-wide">Pay · Card</span>
-                <kbd class="rounded border border-purple-500/40 bg-purple-500/10 px-1.5 py-0.5 font-mono text-[10px] text-purple-200">F6</kbd>
-            </button>
+            <!-- Sale controls -->
+            <section>
+                <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Sale controls</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" class="rail-cell rail-amber" @click="openDiscount">
+                        <TagIcon class="h-4 w-4" />
+                        <span>Discount<br><span class="rail-cell-hint">F3</span></span>
+                    </button>
+                    <button type="button" class="rail-cell rail-rose" :disabled="!cart.length" @click="voidLastItem">
+                        <NoSymbolIcon class="h-4 w-4" />
+                        <span>Void item</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-rose" :disabled="!cart.length" @click="cancelAll">
+                        <XMarkIcon class="h-4 w-4" />
+                        <span>Cancel all</span>
+                    </button>
 
-            <div class="my-1 h-px bg-zinc-800" />
+                    <button type="button" class="rail-cell rail-zinc" @click="openSearchModal">
+                        <MagnifyingGlassIcon class="h-4 w-4" />
+                        <span>Search<br><span class="rail-cell-hint">F2</span></span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" :disabled="!cart.length" @click="holdSale">
+                        <PauseIcon class="h-4 w-4" />
+                        <span>Hold sale</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" :disabled="!heldSales.length" @click="recallHeldSale">
+                        <ListIcon class="h-4 w-4" />
+                        <span>Recall<br><span class="rail-cell-hint">{{ heldSales.length }} held</span></span>
+                    </button>
 
-            <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Actions</p>
+                    <button type="button" class="rail-cell rail-zinc" :disabled="!cart.length" @click="promptPriceOverride">
+                        <PencilIcon class="h-4 w-4" />
+                        <span>Price override</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" :disabled="!cart.length" @click="promptQuantity">
+                        <HashIcon class="h-4 w-4" />
+                        <span>Set qty</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" @click="addMiscItem">
+                        <PackagePlusIcon class="h-4 w-4" />
+                        <span>Misc item</span>
+                    </button>
+                </div>
+            </section>
 
-            <button
-                type="button"
-                class="flex h-12 items-center gap-3 rounded-xl border border-amber-500/40 bg-amber-500/5 px-4 text-left text-amber-300 transition hover:bg-amber-500/15 focus:outline-none focus:ring-2 focus:ring-amber-400/60 disabled:cursor-not-allowed disabled:opacity-40"
-                @click="openDiscount"
-            >
-                <TagIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium">Discount</span>
-                <kbd class="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-200">F3</kbd>
-            </button>
-            <button
-                type="button"
-                class="flex h-12 items-center gap-3 rounded-xl border border-rose-500/40 bg-rose-500/5 px-4 text-left text-rose-300 transition hover:bg-rose-500/15 focus:outline-none focus:ring-2 focus:ring-rose-400/60 disabled:cursor-not-allowed disabled:opacity-40"
-                :disabled="!cart.length"
-                @click="voidLastItem"
-            >
-                <NoSymbolIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium">Void item</span>
-            </button>
-            <button
-                type="button"
-                class="flex h-12 items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800/40 px-4 text-left text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                @click="openSearchModal"
-            >
-                <MagnifyingGlassIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium">Search</span>
-                <kbd class="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">F2</kbd>
-            </button>
-            <button
-                type="button"
-                class="flex h-12 items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800/40 px-4 text-left text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                @click="newSale(true)"
-            >
-                <ArrowPathIcon class="h-5 w-5" />
-                <span class="flex-1 text-sm font-medium">New sale</span>
-                <kbd class="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">F1</kbd>
-            </button>
+            <!-- Customer + drawer -->
+            <section>
+                <p class="mb-2 text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Customer · drawer</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" class="rail-cell rail-zinc" @click="promptAssignCustomer">
+                        <UserIcon class="h-4 w-4" />
+                        <span>Assign<br>customer</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" @click="recordDrawerOpen">
+                        <ArchiveIcon class="h-4 w-4" />
+                        <span>Open<br>drawer</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" @click="recordCashDrop">
+                        <ArrowDownIcon class="h-4 w-4" />
+                        <span>Cash drop</span>
+                    </button>
 
-            <div class="mt-auto space-y-3 border-t border-zinc-800 pt-3">
-                <div v-if="stkStatusMessage" class="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-400">
+                    <button type="button" class="rail-cell rail-zinc" @click="recordPayout">
+                        <ArrowUpIcon class="h-4 w-4" />
+                        <span>Payout</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc" :disabled="!lastSaleId" @click="reprintReceipt">
+                        <PrinterIcon class="h-4 w-4" />
+                        <span>Reprint</span>
+                    </button>
+                    <button type="button" class="rail-cell rail-rose" :disabled="!lastSaleId" @click="voidLastSalePrompt">
+                        <UndoIcon class="h-4 w-4" />
+                        <span>Void sale</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Quick cash -->
+            <section>
+                <div class="flex items-center justify-between">
+                    <p class="text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">Quick cash</p>
+                    <span class="text-[10px] uppercase tracking-[0.18em] text-zinc-600">tap to tender</span>
+                </div>
+                <div class="mt-2 grid grid-cols-4 gap-2">
+                    <button v-for="preset in cashPresetButtons" :key="preset" type="button" class="rail-money" :disabled="!canCheckout" @click="tenderExactCash(preset)">
+                        {{ formatCurrency(preset) }}
+                    </button>
+                </div>
+                <button type="button" class="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-500/40 bg-blue-500/10 text-sm font-medium text-blue-300 hover:bg-blue-500/20 disabled:cursor-not-allowed disabled:opacity-40" :disabled="!canCheckout" @click="tenderExactCash(grandTotal)">
+                    Exact cash · <span class="tabular-nums">{{ formatCurrency(grandTotal) }}</span>
+                </button>
+            </section>
+
+            <!-- Session -->
+            <section class="mt-auto border-t border-zinc-800 pt-3">
+                <div v-if="stkStatusMessage" class="mb-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] text-zinc-400">
                     {{ stkStatusMessage }}
                 </div>
-                <button
-                    type="button"
-                    class="flex h-12 w-full items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-800/40 px-4 text-left text-zinc-300 transition hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-500"
-                    @click="logout"
-                >
-                    <LockClosedIcon class="h-5 w-5" />
-                    <span class="flex-1 text-sm font-medium">Lock</span>
-                    <kbd class="rounded border border-zinc-700 bg-zinc-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-500">F10</kbd>
-                </button>
-            </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button type="button" class="rail-cell rail-zinc h-12" @click="newSale(true)">
+                        <ArrowPathIcon class="h-4 w-4" />
+                        <span>New sale<br><span class="rail-cell-hint">F1</span></span>
+                    </button>
+                    <button type="button" class="rail-cell rail-zinc h-12" @click="logout">
+                        <LockClosedIcon class="h-4 w-4" />
+                        <span>Lock<br><span class="rail-cell-hint">F10</span></span>
+                    </button>
+                </div>
+            </section>
         </aside>
 
         <ToastStack :toasts="toasts" />
@@ -341,28 +397,73 @@
     </div>
 </template>
 
+<style scoped>
+.rail-tender { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.25rem; height:4rem; padding:0.5rem; border-radius:0.5rem; border:1px solid; transition:background-color 150ms; }
+.rail-tender:disabled { opacity:0.4; cursor:not-allowed; }
+.rail-tender > span { font-size:11px; font-weight:500; }
+.rail-tender-kbd { font-size:10px; opacity:0.7; }
+.rail-tender-sm { display:flex; flex-direction:column; align-items:center; justify-content:center; height:3rem; padding:0.25rem 0.5rem; border-radius:0.5rem; border:1px solid; transition:background-color 150ms; }
+.rail-tender-sm:disabled { opacity:0.4; cursor:not-allowed; }
+.rail-tender-sm > span:first-child { font-size:11px; font-weight:500; }
+.rail-tender-hint { font-size:10px; text-transform:uppercase; letter-spacing:0.18em; opacity:0.7; }
+.rail-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.2rem; height:3.75rem; padding:0.25rem 0.4rem; border-radius:0.5rem; border:1px solid; transition:background-color 150ms; text-align:center; line-height:1.15; }
+.rail-cell:disabled { opacity:0.4; cursor:not-allowed; }
+.rail-cell > span { font-size:11px; font-weight:500; }
+.rail-cell-hint { font-size:10px; opacity:0.6; }
+.rail-money { display:flex; align-items:center; justify-content:center; height:2.5rem; border-radius:0.5rem; border:1px solid rgb(63 63 70); background:rgb(24 24 27); color:rgb(228 228 231); font-size:12px; font-weight:500; font-variant-numeric:tabular-nums; transition:background-color 150ms; }
+.rail-money:hover { background:rgb(39 39 42); }
+.rail-money:disabled { opacity:0.4; cursor:not-allowed; }
+.rail-emerald { border-color:rgba(16, 185, 129, 0.4); background:rgba(16, 185, 129, 0.10); color:rgb(110 231 183); }
+.rail-emerald:hover { background:rgba(16, 185, 129, 0.20); }
+.rail-emerald-soft { border-color:rgba(16, 185, 129, 0.30); background:rgba(16, 185, 129, 0.05); color:rgb(110 231 183); }
+.rail-emerald-soft:hover { background:rgba(16, 185, 129, 0.15); }
+.rail-blue { border-color:rgba(59, 130, 246, 0.4); background:rgba(59, 130, 246, 0.10); color:rgb(147 197 253); }
+.rail-blue:hover { background:rgba(59, 130, 246, 0.20); }
+.rail-purple { border-color:rgba(168, 85, 247, 0.4); background:rgba(168, 85, 247, 0.10); color:rgb(216 180 254); }
+.rail-purple:hover { background:rgba(168, 85, 247, 0.20); }
+.rail-amber { border-color:rgba(245, 158, 11, 0.4); background:rgba(245, 158, 11, 0.05); color:rgb(252 211 77); }
+.rail-amber:hover { background:rgba(245, 158, 11, 0.15); }
+.rail-rose { border-color:rgba(244, 63, 94, 0.4); background:rgba(244, 63, 94, 0.05); color:rgb(253 164 175); }
+.rail-rose:hover { background:rgba(244, 63, 94, 0.15); }
+.rail-zinc { border-color:rgb(63 63 70); background:rgba(39, 39, 42, 0.4); color:rgb(212 212 216); }
+.rail-zinc:hover { background:rgb(39 39 42); }
+.rail-zinc-strong { border-color:rgb(82 82 91); background:rgba(39, 39, 42, 0.6); color:rgb(228 228 231); }
+.rail-zinc-strong:hover { background:rgb(39 39 42); }
+.rail-disabled { border-color:rgb(39 39 42); background:rgb(9 9 11); color:rgb(82 82 91); }
+</style>
 
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Head, usePage } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import {
+    Archive as ArchiveIcon,
+    ArrowDown as ArrowDownIcon,
+    ArrowUp as ArrowUpIcon,
     Ban as NoSymbolIcon,
     Banknote as BanknotesIcon,
     Coffee,
     CreditCard as CreditCardIcon,
     Croissant,
     GlassWater,
+    Hash as HashIcon,
+    List as ListIcon,
     Lock as LockClosedIcon,
     Package as CubeIcon,
+    PackagePlus as PackagePlusIcon,
+    Pause as PauseIcon,
+    Pencil as PencilIcon,
     Popcorn,
+    Printer as PrinterIcon,
     RefreshCw as ArrowPathIcon,
+    RotateCcw as UndoIcon,
     ScanBarcode as BarcodeIcon,
     Search as MagnifyingGlassIcon,
     ShoppingBag as BuildingStorefrontIcon,
     ShoppingCart as ShoppingCartIcon,
     Smartphone as DevicePhoneMobileIcon,
     Tag as TagIcon,
+    User as UserIcon,
     X as XMarkIcon,
 } from 'lucide-vue-next';
 import PaymentDialog from '../Components/Pos/PaymentDialog.vue';
@@ -416,6 +517,9 @@ const managerPin = ref('');
 const customerPhone = ref('');
 const cashReceived = ref(0);
 const stkPhone = ref('2547');
+const heldSales = ref([]);
+const lastSaleId = ref(null);
+const lastReceiptNumber = ref(null);
 const checkoutBusy = ref(false);
 const pinBusy = ref(false);
 const liveFeedBusy = ref(false);
@@ -462,6 +566,8 @@ const cashPresets = computed(() => {
         Math.ceil(total / 200) * 200,
     ])).filter((value) => value > 0);
 });
+
+const cashPresetButtons = [50, 100, 200, 500, 1000, 1500, 2000, 5000];
 
 const {
     focusPriorityInput,
@@ -517,23 +623,25 @@ const categories = [
 ];
 
 const mockCatalog = [
-    { id: 'm-001', sku: 'HOT-ESP-1', name: 'Espresso',        base_price: 150, category: 'hot' },
-    { id: 'm-002', sku: 'HOT-CAP-1', name: 'Cappuccino',      base_price: 220, category: 'hot' },
-    { id: 'm-003', sku: 'HOT-LAT-1', name: 'Latte',           base_price: 250, category: 'hot' },
-    { id: 'm-004', sku: 'HOT-AME-1', name: 'Americano',       base_price: 180, category: 'hot' },
-    { id: 'm-005', sku: 'HOT-MOC-1', name: 'Mocha',           base_price: 280, category: 'hot' },
-    { id: 'm-010', sku: 'CLD-CKE-1', name: 'Coca-Cola 500ml', base_price: 80,  category: 'cold' },
-    { id: 'm-011', sku: 'CLD-FNT-1', name: 'Fanta 500ml',     base_price: 80,  category: 'cold' },
-    { id: 'm-012', sku: 'CLD-WAT-1', name: 'Water 1L',        base_price: 60,  category: 'cold' },
-    { id: 'm-013', sku: 'CLD-JUI-1', name: 'Mango juice',     base_price: 120, category: 'cold' },
-    { id: 'm-020', sku: 'PAS-CRO-1', name: 'Croissant',       base_price: 180, category: 'pastries' },
-    { id: 'm-021', sku: 'PAS-MUF-1', name: 'Blueberry muffin', base_price: 200, category: 'pastries' },
-    { id: 'm-022', sku: 'PAS-DON-1', name: 'Glazed donut',    base_price: 150, category: 'pastries' },
-    { id: 'm-030', sku: 'SNK-CRP-1', name: 'Crisps 50g',      base_price: 90,  category: 'snacks' },
-    { id: 'm-031', sku: 'SNK-NUT-1', name: 'Roasted nuts',    base_price: 220, category: 'snacks' },
-    { id: 'm-032', sku: 'SNK-CHO-1', name: 'Chocolate bar',   base_price: 130, category: 'snacks' },
-    { id: 'm-040', sku: 'HSE-SOAP-1', name: 'Bar soap',       base_price: 95,  category: 'household' },
-    { id: 'm-041', sku: 'HSE-DET-1',  name: 'Detergent 1kg',  base_price: 350, category: 'household' },
+    { id: 'm-001', sku: 'HOT-ESP-1', name: 'Espresso',        base_price: 150, category: 'hot',       logo_url: '/logos/espresso.svg' },
+    { id: 'm-002', sku: 'HOT-CAP-1', name: 'Cappuccino',      base_price: 220, category: 'hot',       logo_url: '/logos/cappuccino.svg' },
+    { id: 'm-003', sku: 'HOT-LAT-1', name: 'Latte',           base_price: 250, category: 'hot',       logo_url: '/logos/latte.svg' },
+    { id: 'm-004', sku: 'HOT-AME-1', name: 'Americano',       base_price: 180, category: 'hot',       logo_url: '/logos/americano.svg' },
+    { id: 'm-005', sku: 'HOT-MOC-1', name: 'Mocha',           base_price: 280, category: 'hot',       logo_url: '/logos/mocha.svg' },
+    { id: 'm-010', sku: 'CLD-CKE-1', name: 'Coca-Cola 500ml', base_price: 80,  category: 'cold',      logo_url: '/logos/coca-cola.svg' },
+    { id: 'm-011', sku: 'CLD-FNT-1', name: 'Fanta 500ml',     base_price: 80,  category: 'cold',      logo_url: '/logos/fanta.svg' },
+    { id: 'm-012', sku: 'CLD-WAT-1', name: 'Water 1L',        base_price: 60,  category: 'cold',      logo_url: '/logos/water.svg' },
+    { id: 'm-013', sku: 'CLD-JUI-1', name: 'Mango juice',     base_price: 120, category: 'cold',      logo_url: '/logos/juice.svg' },
+    { id: 'm-014', sku: 'CLD-MLK-1', name: 'Milk 500ml',      base_price: 70,  category: 'cold',      logo_url: '/logos/milk.svg' },
+    { id: 'm-020', sku: 'PAS-CRO-1', name: 'Croissant',       base_price: 180, category: 'pastries',  logo_url: '/logos/croissant.svg' },
+    { id: 'm-021', sku: 'PAS-MUF-1', name: 'Blueberry muffin', base_price: 200, category: 'pastries', logo_url: '/logos/muffin.svg' },
+    { id: 'm-022', sku: 'PAS-DON-1', name: 'Glazed donut',    base_price: 150, category: 'pastries',  logo_url: '/logos/donut.svg' },
+    { id: 'm-023', sku: 'PAS-BRD-1', name: 'White bread',     base_price: 70,  category: 'pastries',  logo_url: '/logos/bread.svg' },
+    { id: 'm-030', sku: 'SNK-CRP-1', name: 'Crisps 50g',      base_price: 90,  category: 'snacks',    logo_url: '/logos/crisps.svg' },
+    { id: 'm-031', sku: 'SNK-NUT-1', name: 'Roasted nuts',    base_price: 220, category: 'snacks',    logo_url: '/logos/nuts.svg' },
+    { id: 'm-032', sku: 'SNK-CHO-1', name: 'Chocolate bar',   base_price: 130, category: 'snacks',    logo_url: '/logos/chocolate.svg' },
+    { id: 'm-040', sku: 'HSE-SOAP-1', name: 'Bar soap',       base_price: 95,  category: 'household', logo_url: '/logos/soap.svg' },
+    { id: 'm-041', sku: 'HSE-DET-1',  name: 'Detergent 1kg',  base_price: 350, category: 'household', logo_url: '/logos/detergent.svg' },
 ];
 
 const activeCategoryId = ref('all');
@@ -619,6 +727,16 @@ const feedItems = computed(() => {
 
     return items.slice(-8).reverse();
 });
+
+function onLogoError(event) {
+    const target = event?.target;
+    if (!target) return;
+    target.classList.add('hidden');
+    const fallback = target.parentElement?.querySelector('.logo-fallback');
+    if (fallback) {
+        fallback.classList.remove('hidden');
+    }
+}
 
 function quickCheckout(method) {
     if (!canCheckout.value) {
@@ -772,6 +890,7 @@ async function loginWithPin() {
         pin.value = '';
         showPinOverlay.value = false;
         toast('Register unlocked', `${response.data.user.name} is now active on the terminal.`, 'success');
+        await refreshSharedAuth();
         fetchLivePayments();
         focusPriorityInput();
     } catch (error) {
@@ -783,12 +902,36 @@ async function loginWithPin() {
     }
 }
 
+async function refreshSharedAuth() {
+    try {
+        const response = await posApi.fetchMe();
+        if (response.data?.csrf_token) {
+            updateCsrfToken(response.data.csrf_token);
+        }
+        if (!response.data?.authenticated || response.data?.user?.role !== 'cashier') {
+            currentUser.value = null;
+            showPinOverlay.value = true;
+        }
+    } catch (error) {
+        // /api/auth/me is best-effort; failure should not crash the terminal.
+    }
+
+    try {
+        await router.reload({ only: ['auth', 'csrfToken'], preserveScroll: true, preserveState: true });
+    } catch (error) {
+        // Inertia reload is also best-effort.
+    }
+}
+
 async function logout() {
     stopStkPolling();
 
     try {
         if (currentUser.value) {
-            await posApi.logout();
+            const response = await posApi.logout();
+            if (response?.data?.csrf_token) {
+                updateCsrfToken(response.data.csrf_token);
+            }
         }
     } catch (error) {
         // Keep the terminal lock-first even if logout request fails.
@@ -800,6 +943,7 @@ async function logout() {
     showPayModal.value = false;
     newSale(false);
     toast('Register locked', 'The cashier session has been closed.', 'info');
+    await refreshSharedAuth();
     focusPinInput();
 }
 
@@ -987,6 +1131,9 @@ async function finalizeCheckout(payload, resetAfterSuccess = true) {
             toast('Checkout complete', `Sale ${response.data.receipt_number} completed successfully.`, 'success');
         }
 
+        lastSaleId.value = response.data.sale?.id ?? response.data.sale_id ?? null;
+        lastReceiptNumber.value = response.data.receipt_number ?? null;
+
         if (selectedLivePayment.value) {
             selectedLivePayment.value = null;
             fetchLivePayments();
@@ -1005,6 +1152,223 @@ async function finalizeCheckout(payload, resetAfterSuccess = true) {
     } finally {
         checkoutBusy.value = false;
     }
+}
+
+function openCreditTender() {
+    if (!creditSalesEnabled.value) {
+        toast('Credit disabled', 'Credit sales are disabled in settings.', 'error');
+        return;
+    }
+    if (!canCheckout.value) {
+        toast('Cart empty', 'Add at least one item before taking payment.', 'error');
+        return;
+    }
+    paymentTab.value = 'credit';
+    showPayModal.value = true;
+}
+
+function openLiveFeedTender() {
+    if (!canCheckout.value) {
+        toast('Cart empty', 'Add at least one item before taking payment.', 'error');
+        return;
+    }
+    paymentTab.value = 'live';
+    showPayModal.value = true;
+    fetchLivePayments();
+}
+
+function cancelAll() {
+    if (!cart.value.length) {
+        return;
+    }
+    if (!window.confirm('Cancel all items from the current sale?')) {
+        return;
+    }
+    resetCart();
+    customerPhone.value = '';
+    selectedLivePayment.value = null;
+    toast('Sale cleared', 'All items removed from the current sale.', 'info');
+    focusScannerInput(true);
+}
+
+function holdSale() {
+    if (!cart.value.length) {
+        return;
+    }
+    heldSales.value.push({
+        id: `H-${Date.now()}`,
+        cart: JSON.parse(JSON.stringify(cart.value)),
+        customerPhone: customerPhone.value,
+        savedAt: new Date().toISOString(),
+        total: grandTotal.value,
+    });
+    resetCart();
+    customerPhone.value = '';
+    toast('Sale held', `Sale parked. ${heldSales.value.length} held sale(s) waiting.`, 'success');
+    focusScannerInput(true);
+}
+
+function recallHeldSale() {
+    if (!heldSales.value.length) {
+        return;
+    }
+    const recalled = heldSales.value.shift();
+    if (cart.value.length && !window.confirm('Replace current cart with the held sale?')) {
+        // user cancelled; put it back at front
+        heldSales.value.unshift(recalled);
+        return;
+    }
+    resetCart();
+    recalled.cart.forEach((line) => cart.value.push({ ...line }));
+    customerPhone.value = recalled.customerPhone || '';
+    toast('Sale recalled', `Restored sale of ${formatCurrency(recalled.total)}.`, 'success');
+    focusScannerInput(true);
+}
+
+function promptPriceOverride() {
+    const last = cart.value[cart.value.length - 1];
+    if (!last) return;
+    const input = window.prompt(`Override unit price for ${last.name} (base ${formatCurrency(last.base_price)}):`, String(last.base_price));
+    if (input === null) return;
+    const next = Number(input);
+    if (!Number.isFinite(next) || next <= 0) {
+        toast('Invalid price', 'Override price must be a positive number.', 'error');
+        return;
+    }
+    last.discount = Math.max(0, last.base_price - next);
+    normalizeDiscount(last);
+    toast('Price overridden', `${last.name} now ${formatCurrency(effectiveUnitPrice(last))}/unit.`, 'success');
+}
+
+function promptQuantity() {
+    const last = cart.value[cart.value.length - 1];
+    if (!last) return;
+    const input = window.prompt(`Quantity for ${last.name}:`, String(last.quantity));
+    if (input === null) return;
+    const next = Number(input);
+    if (!Number.isFinite(next) || next <= 0) {
+        toast('Invalid quantity', 'Quantity must be greater than zero.', 'error');
+        return;
+    }
+    last.quantity = next;
+    normalizeQuantity(last);
+    toast('Quantity updated', `${last.name} qty set to ${last.quantity}.`, 'success');
+}
+
+function addMiscItem() {
+    const name = window.prompt('Misc item name:', 'Misc item');
+    if (!name) return;
+    const priceInput = window.prompt('Misc item price (KES):', '0');
+    if (priceInput === null) return;
+    const price = Number(priceInput);
+    if (!Number.isFinite(price) || price <= 0) {
+        toast('Invalid price', 'Misc item price must be a positive number.', 'error');
+        return;
+    }
+    cart.value.push({
+        product_id: `MISC-${Date.now()}`,
+        name,
+        sku: 'MISC',
+        quantity: 1,
+        base_price: price,
+        discount: 0,
+        tax_rate: 0,
+        allow_fractional_sales: false,
+    });
+    toast('Misc item added', `${name} added at ${formatCurrency(price)}.`, 'success');
+    focusScannerInput(true);
+}
+
+function promptAssignCustomer() {
+    const input = window.prompt('Customer phone (2547XXXXXXXX):', customerPhone.value || '');
+    if (input === null) return;
+    customerPhone.value = String(input).trim();
+    toast('Customer assigned', customerPhone.value || 'Customer cleared.', 'info');
+}
+
+async function recordDrawerOpen() {
+    try {
+        await posApi.recordCashDrawer({ type: 'pay_in', amount: 0.01, reason: 'Drawer opened (no movement)' });
+        toast('Drawer opened', 'Cash drawer event recorded.', 'success');
+    } catch (error) {
+        toast('Drawer error', error?.response?.data?.message ?? 'Unable to record drawer event.', 'error');
+    }
+}
+
+async function recordCashDrop() {
+    const amountInput = window.prompt('Cash drop amount (KES):', '0');
+    if (amountInput === null) return;
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+        toast('Invalid amount', 'Cash drop amount must be greater than zero.', 'error');
+        return;
+    }
+    const reason = window.prompt('Reason for cash drop:', 'Cash drop to safe') || 'Cash drop';
+    try {
+        await posApi.recordCashDrawer({ type: 'pay_out', amount, reason });
+        toast('Cash drop recorded', `${formatCurrency(amount)} dropped to safe.`, 'success');
+    } catch (error) {
+        toast('Drawer error', error?.response?.data?.message ?? 'Unable to record cash drop.', 'error');
+    }
+}
+
+async function recordPayout() {
+    const amountInput = window.prompt('Payout amount (KES):', '0');
+    if (amountInput === null) return;
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+        toast('Invalid amount', 'Payout amount must be greater than zero.', 'error');
+        return;
+    }
+    const reason = window.prompt('Reason for payout:', 'Supplier payout') || 'Payout';
+    try {
+        await posApi.recordCashDrawer({ type: 'pay_out', amount, reason });
+        toast('Payout recorded', `${formatCurrency(amount)} paid out.`, 'success');
+    } catch (error) {
+        toast('Drawer error', error?.response?.data?.message ?? 'Unable to record payout.', 'error');
+    }
+}
+
+function reprintReceipt() {
+    if (!lastReceiptNumber.value) {
+        toast('Nothing to reprint', 'Complete a sale first.', 'error');
+        return;
+    }
+    window.dispatchEvent(new CustomEvent('pos:reprint-receipt', {
+        detail: { sale_id: lastSaleId.value, receipt_number: lastReceiptNumber.value },
+    }));
+    toast('Reprint queued', `Receipt ${lastReceiptNumber.value} re-emitted to printer.`, 'success');
+}
+
+async function voidLastSalePrompt() {
+    if (!lastSaleId.value) {
+        toast('Nothing to void', 'No completed sale to void in this session.', 'error');
+        return;
+    }
+    const managerPinInput = window.prompt('Manager PIN required to void the last sale:');
+    if (managerPinInput === null) return;
+    try {
+        await posApi.voidSale({ sale_id: lastSaleId.value, manager_pin: String(managerPinInput).trim() });
+        toast('Sale voided', `Sale ${lastReceiptNumber.value} voided. Stock restored.`, 'success');
+        lastSaleId.value = null;
+        lastReceiptNumber.value = null;
+    } catch (error) {
+        toast('Void blocked', error?.response?.data?.message ?? 'Unable to void sale.', 'error');
+    }
+}
+
+async function tenderExactCash(amount) {
+    if (!canCheckout.value) {
+        return;
+    }
+    cashReceived.value = Number(amount);
+    paymentTab.value = 'cash';
+    if (cashReceived.value < grandTotal.value) {
+        toast('Cash shortfall', 'Tendered amount is less than total. Opening payment dialog.', 'error');
+        showPayModal.value = true;
+        return;
+    }
+    await submitCashCheckout();
 }
 
 function newSale(showMessage = true) {
