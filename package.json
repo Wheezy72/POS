@@ -5,7 +5,6 @@
     "scripts": {
         "build": "vite build",
         "dev": "cross-env LARAVEL_BYPASS_ENV_CHECK=1 vite --host 127.0.0.1 --port 7075 --strictPort"
-        "dev": "cross-env LARAVEL_BYPASS_ENV_CHECK=1 vite --host 127.0.0.1 --port 7075 --strictPort"
     },
     "dependencies": {
         "@heroicons/vue": "^2.2.0",
