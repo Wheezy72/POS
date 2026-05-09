@@ -42,6 +42,10 @@ return [
             'journal_mode' => 'wal',
             'synchronous' => 'normal',
             'transaction_mode' => 'DEFERRED',
+            'options' => [
+                PDO::ATTR_TIMEOUT => 5, // PDO timeout in seconds (matching busy_timeout 5000ms)
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ],
         ],
 
         'mysql' => [

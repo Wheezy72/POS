@@ -7,35 +7,49 @@ use Illuminate\Support\Facades\Log;
 
 class ReceiptPrinterService
 {
-    public function printSale(?Sale $sale): void
+    /**
+     * Generate ESC/POS byte payload for a thermal printer and encode as base64.
+     */
+    public function generateReceiptPayload(Sale $sale): string
     {
-        if ($sale === null) {
-            return;
-        }
-
         $commands = $this->buildEscPosCommands($sale);
-
-        // Day 2 scaffold only:
-        // the queue/job boundary is in place so a future hardware adapter can
-        // write these raw bytes directly to a USB or network ESC/POS printer.
-        Log::info('ESC/POS receipt payload prepared.', [
-            'sale_id' => $sale->id,
-            'receipt_number' => $sale->receipt_number,
-            'hex' => bin2hex($commands),
-        ]);
+        return base64_encode($commands);
     }
 
     private function buildEscPosCommands(Sale $sale): string
     {
-        $lines = [
-            "\x1B\x40",
-            "DUKA APP\r\n",
-            "Receipt {$sale->receipt_number}\r\n",
-            "Total KES " . number_format((float) $sale->grand_total, 2) . "\r\n",
-            "Thank you\r\n",
-            "\x1D\x56\x41\x03",
-        ];
+        $esc = "\x1b";
+        $gs = "\x1d";
 
-        return implode('', $lines);
+        // Initialize printer
+        $data = $esc . "@";
+
+        // Center align
+        $data .= $esc . "a" . "\x01";
+        $data .= "DUKA-APP POS\n";
+        $data .= "--------------------------------\n";
+        
+        // Left align
+        $data .= $esc . "a" . "\x00";
+        $data .= "Receipt: " . $sale->receipt_number . "\n";
+        $data .= "Date: " . $sale->created_at->format('Y-m-d H:i') . "\n";
+        $data .= "--------------------------------\n";
+
+        foreach ($sale->items as $item) {
+            $name = str_pad(substr($item->product->name, 0, 20), 20);
+            $qty = str_pad((string)$item->quantity, 4, ' ', STR_PAD_LEFT);
+            $total = str_pad(number_format($item->total_price, 2), 8, ' ', STR_PAD_LEFT);
+            $data .= "{$name} {$qty} {$total}\n";
+        }
+
+        $data .= "--------------------------------\n";
+        $data .= "TOTAL: " . number_format($sale->total_amount, 2) . "\n";
+        $data .= "--------------------------------\n";
+        $data .= "\n\n\n\n"; // Paper feed
+
+        // Cut paper
+        $data .= $gs . "V" . "\x41" . "\x03";
+
+        return $data;
     }
 }

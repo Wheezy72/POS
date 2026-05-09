@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Middleware\NtpSyncCheck;
+use App\Http\Middleware\MpesaIpWhitelist;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\EnsureAppIsConfigured;
 use App\Http\Middleware\EnsureUserHasRole;
@@ -23,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
+            'ntp.sync' => NtpSyncCheck::class,
+            'mpesa.whitelist' => MpesaIpWhitelist::class,
             'app.configured' => EnsureAppIsConfigured::class,
             'role' => EnsureUserHasRole::class,
         ]);
