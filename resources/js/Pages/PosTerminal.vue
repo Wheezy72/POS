@@ -164,7 +164,8 @@ const pinInput = ref(null);
 const searchInput = ref(null);
 const paymentInput = ref(null);
 
-const currentUser = ref(page.props.auth?.user ?? null);
+const initialUser = page.props.auth?.user;
+const currentUser = ref(initialUser?.role === 'cashier' ? initialUser : null);
 const blockedRole = computed(() => page.props.auth?.blockedRole ?? null);
 
 const clock = ref('');

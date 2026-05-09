@@ -1,13 +1,13 @@
 {
-  "_useToasts-CkvjtAD2.js": {
-    "file": "assets/useToasts-CkvjtAD2.js",
+  "_useToasts-DJon9QXt.js": {
+    "file": "assets/useToasts-DJon9QXt.js",
     "name": "useToasts",
     "imports": [
       "resources/js/app.js"
     ]
   },
   "resources/css/app.css": {
-    "file": "assets/app-BcjkGO2v.css",
+    "file": "assets/app-5QInDuWM.css",
     "name": "app",
     "names": [
       "app.css"
@@ -16,7 +16,7 @@
     "isEntry": true
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-BIhNODp2.css",
+    "file": "assets/theme-DnTkbUSo.css",
     "name": "theme",
     "names": [
       "theme.css"
@@ -25,27 +25,27 @@
     "isEntry": true
   },
   "resources/js/Pages/AdminDashboard.vue": {
-    "file": "assets/AdminDashboard-CQmI1QoA.js",
+    "file": "assets/AdminDashboard-C-c4hUaK.js",
     "name": "AdminDashboard",
     "src": "resources/js/Pages/AdminDashboard.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.js",
-      "_useToasts-CkvjtAD2.js"
+      "_useToasts-DJon9QXt.js"
     ]
   },
   "resources/js/Pages/PosTerminal.vue": {
-    "file": "assets/PosTerminal-DDRL9FEm.js",
+    "file": "assets/PosTerminal-CxBTkFMz.js",
     "name": "PosTerminal",
     "src": "resources/js/Pages/PosTerminal.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/app.js",
-      "_useToasts-CkvjtAD2.js"
+      "_useToasts-DJon9QXt.js"
     ]
   },
   "resources/js/Pages/SetupWizard.vue": {
-    "file": "assets/SetupWizard-CyMZAlos.js",
+    "file": "assets/SetupWizard-CUXAM6ZM.js",
     "name": "SetupWizard",
     "src": "resources/js/Pages/SetupWizard.vue",
     "isDynamicEntry": true,
@@ -54,7 +54,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-BsxatYMl.js",
+    "file": "assets/app-hoyGBKkN.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -64,7 +64,7 @@
       "resources/js/Pages/SetupWizard.vue"
     ],
     "css": [
-      "assets/app-BcjkGO2v.css"
+      "assets/app-5QInDuWM.css"
     ]
   }
 }
