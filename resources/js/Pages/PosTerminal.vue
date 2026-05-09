@@ -673,7 +673,9 @@ onMounted(() => {
 
     window.addEventListener('pos:unauthenticated', handleUnauthenticated);
 
-    if (!currentUser.value) {
+    if (currentUser.value) {
+        ensureOpenShift();
+    } else {
         focusPinInput();
     }
 });
@@ -737,7 +739,7 @@ async function loginWithPin() {
         showPinOverlay.value = false;
         toast('Register unlocked', `${response.data.user.name} is now active on the terminal.`, 'success');
         await refreshSharedAuth();
-        fetchLivePayments();
+        await ensureOpenShift();
         focusPriorityInput();
     } catch (error) {
         const message = error?.response?.data?.message ?? 'Unable to unlock the register.';
@@ -773,11 +775,9 @@ async function logout() {
     stopStkPolling();
 
     try {
-        if (currentUser.value) {
-            const response = await posApi.logout();
-            if (response?.data?.csrf_token) {
-                updateCsrfToken(response.data.csrf_token);
-            }
+        const response = await posApi.logout();
+        if (response?.data?.csrf_token) {
+            updateCsrfToken(response.data.csrf_token);
         }
     } catch (error) {
         // Keep the terminal lock-first even if logout request fails.
@@ -788,9 +788,19 @@ async function logout() {
     showSearchModal.value = false;
     showPayModal.value = false;
     newSale(false);
-    toast('Register locked', 'The cashier session has been closed.', 'info');
-    await refreshSharedAuth();
-    focusPinInput();
+    window.location.assign('/');
+}
+
+async function ensureOpenShift() {
+    try {
+        await posApi.openShift(0);
+    } catch (error) {
+        const message = error?.response?.data?.message ?? '';
+
+        if (message !== 'An open shift already exists for this user.') {
+            toast('Shift not opened', message || 'Unable to open a cashier shift.', 'error');
+        }
+    }
 }
 
 function handleUnauthenticated() {
