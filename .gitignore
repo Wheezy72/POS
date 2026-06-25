@@ -12,41 +12,10 @@ composer.phar
 auth.json
 
 # NPM / package manager
-package-lock.json
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
-# Laravel generated files
+# Laravel key files
 /storage/*.key
-/storage/app/*
-!/storage/app/.gitignore
-/storage/app/private/*
-!/storage/app/private/.gitignore
-/storage/app/public/*
-!/storage/app/public/.gitignore
-/storage/framework/cache/*
-!/storage/framework/cache/.gitignore
-/storage/framework/cache/data/*
-!/storage/framework/cache/data/.gitignore
-/storage/framework/sessions/*
-!/storage/framework/sessions/.gitignore
-/storage/framework/testing/*
-!/storage/framework/testing/.gitignore
-/storage/framework/views/*
-!/storage/framework/views/.gitignore
-/storage/logs/*
-!/storage/logs/.gitignore
-
-# Bootstrap cache
-/bootstrap/cache/*
-!/bootstrap/cache/.gitignore
-
-# Local database / SQLite
-/database/*.sqlite
-/database/*.sqlite-*
-/database/database.sqlite
 
 # Build output
 /public/build/
@@ -69,14 +38,6 @@ pnpm-debug.log*
 *.tar.gz
 *.sql
 *.sqlite.bak
-
-# POS / local device artifacts
-/receipts/
-/prints/
-/printer-spool/
-/hardware-logs/
-/sync-cache/
-/offline-cache/
 
 # IDEs and editors
 .idea/
