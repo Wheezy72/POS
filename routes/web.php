@@ -35,6 +35,7 @@ Route::middleware(['auth', 'role:cashier', 'ntp.sync'])->prefix('api/pos')->grou
 });
 
 Route::post('/api/webhooks/mpesa/c2b', [PaymentApiController::class, 'receiveC2bWebhook'])->middleware('mpesa.whitelist');
+Route::post('/api/webhooks/mpesa/stk-callback', [PaymentApiController::class, 'receiveStkCallback'])->middleware('mpesa.whitelist');
 Route::post('/api/login-pin', [SecurityApiController::class, 'posPinLogin'])
     ->middleware('throttle:5,10');
 
@@ -44,6 +45,7 @@ Route::prefix('api/auth')->group(function (): void {
         ->middleware('throttle:5,10');
     Route::post('/admin-pin-login', [SecurityApiController::class, 'adminPinLogin'])
         ->middleware('throttle:5,10');
+    Route::post('/refresh-session', [SecurityApiController::class, 'refreshSession']);
 });
 
 Route::middleware('auth')->group(function (): void {

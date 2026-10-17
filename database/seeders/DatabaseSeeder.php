@@ -43,6 +43,15 @@ class DatabaseSeeder extends Seeder
             'enable_etims' => false,
             'enable_loyalty_points' => true,
             'enable_hardware_printer' => false,
+            'pos_clock_warn_drift_seconds' => 30,
+            'pos_clock_reject_drift_seconds' => 300,
+            'pricing_expiry_markdown_hours' => 48,
+            'pricing_expiry_markdown_percentage' => 50,
+            'pricing_stock_age_mid_days' => 90,
+            'pricing_stock_age_old_days' => 120,
+            'pricing_margin_multiplier_fresh' => 1.15,
+            'pricing_margin_multiplier_mid' => 1.05,
+            'pricing_margin_multiplier_old' => 1.00,
             'enable_fractional_stock' => false,
             'enable_wholesale' => false,
             'enable_sales_hours_lock' => false,
@@ -50,7 +59,7 @@ class DatabaseSeeder extends Seeder
         ] as $key => $value) {
             SystemSetting::query()->updateOrCreate(
                 ['key' => $key],
-                ['value' => $value ? 'true' : 'false'],
+                ['value' => is_bool($value) ? ($value ? 'true' : 'false') : (string) $value],
             );
         }
     }

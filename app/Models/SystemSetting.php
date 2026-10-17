@@ -25,6 +25,20 @@ class SystemSetting extends Model
         return (bool) static::value($key, $default);
     }
 
+    public static function integer(string $key, int $default): int
+    {
+        $value = static::value($key, $default);
+
+        return is_numeric($value) ? (int) $value : $default;
+    }
+
+    public static function decimal(string $key, float $default): float
+    {
+        $value = static::value($key, $default);
+
+        return is_numeric($value) ? (float) $value : $default;
+    }
+
     public static function featureFlags(): array
     {
         $defaults = [

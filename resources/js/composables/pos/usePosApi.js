@@ -1,8 +1,9 @@
 export function usePosApi(http = window.axios) {
     return {
-        loginWithPin: (pin) => http.post('/api/login-pin', { pin }),
+        loginWithPin: (identifier, pin) => http.post('/api/login-pin', { identifier, pin }),
         logout: () => http.post('/api/logout'),
         fetchMe: () => http.get('/api/auth/me'),
+        refreshSession: () => http.post('/api/auth/refresh-session'),
         openShift: (openingCash = 0) => http.post('/api/shifts/open', { opening_cash: openingCash }),
         recordCashDrawer: (payload) => http.post('/api/shifts/cash-drawer-transactions', payload),
         voidSale: (payload) => http.post('/api/pos/void-sale', payload),

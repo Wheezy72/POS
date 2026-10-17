@@ -17,6 +17,17 @@
 
             <label class="mt-5 block text-[10px] font-medium uppercase tracking-[0.22em] text-zinc-500">{{ label }}</label>
             <input
+                v-if="showIdentifier"
+                ref="identifierInput"
+                :value="identifier"
+                type="text"
+                autocomplete="username"
+                class="mt-2 h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 text-sm font-medium text-zinc-50 outline-none placeholder:text-zinc-600 focus:border-emerald-500/60 focus:ring-2 focus:ring-emerald-500/30"
+                :placeholder="identifierPlaceholder"
+                @input="$emit('update:identifier', $event.target.value.trim())"
+                @keydown.enter.prevent="pinInput?.focus?.()"
+            >
+            <input
                 ref="pinInput"
                 :value="pin"
                 type="password"
@@ -60,6 +71,18 @@ const props = defineProps({
         type: String,
         default: null,
     },
+    identifier: {
+        type: String,
+        default: '',
+    },
+    showIdentifier: {
+        type: Boolean,
+        default: false,
+    },
+    identifierPlaceholder: {
+        type: String,
+        default: 'Cashier email or user ID',
+    },
     pin: {
         type: String,
         required: true,
@@ -84,9 +107,11 @@ const props = defineProps({
 
 defineEmits([
     'submit',
+    'update:identifier',
     'update:pin',
 ]);
 
+const identifierInput = ref(null);
 const pinInput = ref(null);
 const blockedMessage = computed(() => {
     const target = props.context === 'admin' ? 'the owner dashboard' : 'the cashier terminal';
@@ -96,6 +121,11 @@ const blockedMessage = computed(() => {
 
 defineExpose({
     focus() {
+        if (props.showIdentifier) {
+            identifierInput.value?.focus();
+            return;
+        }
+
         pinInput.value?.focus();
     },
 });

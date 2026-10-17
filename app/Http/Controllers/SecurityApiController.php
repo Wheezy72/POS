@@ -347,6 +347,13 @@ class SecurityApiController extends Controller
         ]);
     }
 
+    public function refreshSession(Request $request): JsonResponse
+    {
+        $request->session()->regenerateToken();
+
+        return $this->me($request);
+    }
+
     private function findUserByPin(string $pin, array $roles = []): ?User
     {
         $query = User::query()->whereNotNull('pin');
@@ -365,12 +372,32 @@ class SecurityApiController extends Controller
         return null;
     }
 
+    private function findUserByIdentifier(string $identifier, array $roles = []): ?User
+    {
+        $query = User::query()
+            ->whereNotNull('pin')
+            ->where(function ($builder) use ($identifier): void {
+                $builder->where('email', $identifier);
+
+                if (ctype_digit($identifier)) {
+                    $builder->orWhereKey((int) $identifier);
+                }
+            });
+
+        if ($roles !== []) {
+            $query->whereIn('role', $roles);
+        }
+
+        return $query->first();
+    }
+
     private function authenticatePinLogin(
         Request $request,
         array $roles = [],
         ?string $forbiddenMessage = null,
     ): JsonResponse {
         $validated = $request->validate([
+            'identifier' => ['nullable', 'string', 'max:255'],
             'pin' => ['required', 'string', 'regex:/^\d{4}(\d{2})?$/'],
         ]);
 
@@ -383,10 +410,21 @@ class SecurityApiController extends Controller
             ], 429);
         }
 
-        // PINs are stored as one-way hashes, so they cannot be queried directly.
-        // In a POS environment the active user list is typically small enough that
-        // verifying against the staff roster is acceptable and keeps the PIN secret at rest.
-        $user = $this->findUserByPin($validated['pin']);
+        $identifier = trim((string) ($validated['identifier'] ?? ''));
+        $user = null;
+
+        if ($identifier !== '') {
+            $candidate = $this->findUserByIdentifier($identifier);
+
+            if ($candidate !== null && Hash::check($validated['pin'], $candidate->pin)) {
+                $user = $candidate;
+            }
+        } elseif (
+            config('pos.auth.allow_pin_roster_fallback', false)
+            && app()->environment(['local', 'testing'])
+        ) {
+            $user = $this->findUserByPin($validated['pin']);
+        }
 
         if ($user === null) {
             RateLimiter::hit($throttleKey, 60);

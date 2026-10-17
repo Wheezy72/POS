@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Models\Sale;
@@ -7,12 +9,24 @@ use Illuminate\Support\Facades\Log;
 
 class ReceiptPrinterService
 {
+    public function printSale(Sale $sale): void
+    {
+        $payload = $this->generateReceiptPayload($sale);
+
+        Log::info('Receipt payload generated for hardware print queue.', [
+            'sale_id' => $sale->id,
+            'receipt_number' => $sale->receipt_number,
+            'payload_length' => strlen($payload),
+        ]);
+    }
+
     /**
      * Generate ESC/POS byte payload for a thermal printer and encode as base64.
      */
     public function generateReceiptPayload(Sale $sale): string
     {
         $commands = $this->buildEscPosCommands($sale);
+
         return base64_encode($commands);
     }
 
@@ -35,15 +49,15 @@ class ReceiptPrinterService
         $data .= "Date: " . $sale->created_at->format('Y-m-d H:i') . "\n";
         $data .= "--------------------------------\n";
 
-        foreach ($sale->items as $item) {
-            $name = str_pad(substr($item->product->name, 0, 20), 20);
-            $qty = str_pad((string)$item->quantity, 4, ' ', STR_PAD_LEFT);
-            $total = str_pad(number_format($item->total_price, 2), 8, ' ', STR_PAD_LEFT);
+        foreach ($sale->saleItems as $item) {
+            $name = str_pad(substr($item->item_name, 0, 20), 20);
+            $qty = str_pad((string) $item->quantity, 4, ' ', STR_PAD_LEFT);
+            $total = str_pad(number_format((float) $item->subtotal, 2), 8, ' ', STR_PAD_LEFT);
             $data .= "{$name} {$qty} {$total}\n";
         }
 
         $data .= "--------------------------------\n";
-        $data .= "TOTAL: " . number_format($sale->total_amount, 2) . "\n";
+        $data .= "TOTAL: " . number_format((float) $sale->grand_total, 2) . "\n";
         $data .= "--------------------------------\n";
         $data .= "\n\n\n\n"; // Paper feed
 
