@@ -21,6 +21,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -59,6 +60,7 @@ class POSApiController extends Controller
             'customer_phone' => ['nullable', 'string', 'max:32'],
             'manager_pin' => ['nullable', 'string', 'regex:/^\d{4}(\d{2})?$/'],
             'claim_transaction_code' => ['nullable', 'string', 'max:255'],
+            'claim_phone_suffix' => ['nullable', 'digits:4'],
             'cart' => ['required', 'array', 'min:1'],
             'cart.*.product_id' => ['required', 'uuid'],
             'cart.*.quantity' => ['required', 'numeric'],
@@ -97,6 +99,7 @@ class POSApiController extends Controller
                     'receipt_number' => $existingSale->receipt_number,
                     'sale' => $existingSale,
                     'pricing_adjustments' => [],
+                    'receipt_payload' => app(ReceiptPrinterService::class)->generateReceiptPayload($existingSale),
                 ]);
             }
         }
@@ -129,9 +132,12 @@ class POSApiController extends Controller
                 $products = Product::query()
                     ->with('taxCategory')
                     ->whereIn('id', $productIds)
+                    ->orderBy('id')
                     ->lockForUpdate()
                     ->get()
                     ->keyBy('id');
+
+                $pricingRules = $this->pricingRules();
 
                 $subtotal = 0.0;
                 $taxTotal = 0.0;
@@ -174,8 +180,11 @@ class POSApiController extends Controller
                     // price by 50% to improve sell-through before the stock becomes waste.
                     $engineUnitPrice = $basePrice;
 
-                    if ($this->expiresWithin48Hours($product->batch_expiry_date)) {
-                        $engineUnitPrice = round($basePrice * 0.5, 2);
+                    if ($this->expiresWithin48Hours($product->batch_expiry_date, $pricingRules['expiry_markdown_hours'])) {
+                        $engineUnitPrice = round(
+                            $basePrice * ((100 - $pricingRules['expiry_markdown_percentage']) / 100),
+                            2
+                        );
                         $priceSource = 'expiry_markdown';
                     }
 
@@ -183,12 +192,12 @@ class POSApiController extends Controller
                     // Older stock is allowed to break margin more aggressively so dead inventory can
                     // be converted back into cash instead of sitting on the shelf indefinitely.
                     $daysSinceLastReceived = $this->daysSinceLastReceived($product->last_received_date);
-                    $marginFloorMultiplier = 1.15;
+                    $marginFloorMultiplier = $pricingRules['margin_multiplier_fresh'];
 
-                    if ($daysSinceLastReceived > 120) {
-                        $marginFloorMultiplier = 1.00;
-                    } elseif ($daysSinceLastReceived > 90) {
-                        $marginFloorMultiplier = 1.05;
+                    if ($daysSinceLastReceived > $pricingRules['stock_age_old_days']) {
+                        $marginFloorMultiplier = $pricingRules['margin_multiplier_old'];
+                    } elseif ($daysSinceLastReceived > $pricingRules['stock_age_mid_days']) {
+                        $marginFloorMultiplier = $pricingRules['margin_multiplier_mid'];
                     }
 
                     $marginFloor = round($costPrice * $marginFloorMultiplier, 2);
@@ -272,6 +281,15 @@ class POSApiController extends Controller
                     throw new RuntimeException('Split payment total must equal the grand total.');
                 }
 
+                if ($claimedIncomingPayment !== null) {
+                    $this->validateClaimedIncomingPayment(
+                        $validated,
+                        $claimedIncomingPayment,
+                        $grandTotal,
+                        $customer,
+                    );
+                }
+
                 if ($claimedIncomingPayment !== null && ! collect($normalizedPayments)->contains(
                     fn (array $payment): bool => $payment['method'] === 'mpesa'
                 )) {
@@ -287,6 +305,10 @@ class POSApiController extends Controller
                     $claimedIncomingPayment
                 );
 
+                $hasPendingPayments = collect($normalizedPayments)->contains(
+                    fn (array $payment): bool => ($payment['status'] ?? 'completed') === 'pending'
+                );
+
                 $sale = Sale::query()->create([
                     'user_id' => $cashierId,
                     'terminal_id' => $validated['terminal_id'] ?? null,
@@ -295,7 +317,7 @@ class POSApiController extends Controller
                     'tax_total' => $taxTotal,
                     'discount_total' => $discountTotal,
                     'grand_total' => $grandTotal,
-                    'status' => 'completed',
+                    'status' => $hasPendingPayments ? 'parked' : 'completed',
                     'is_suspected_duplicate' => $duplicateSignal['is_suspected_duplicate'],
                     'suspected_duplicate_reason' => $duplicateSignal['reason'],
                     'receipt_number' => $this->generateReceiptNumber(),
@@ -342,7 +364,11 @@ class POSApiController extends Controller
                         'reference_number' => $referenceNumber,
                         'status' => $paymentData['method'] === 'credit_deni'
                             ? 'pending'
-                            : ($paymentData['status'] ?? 'completed'),
+                            : (
+                                $paymentData['method'] === 'mpesa' && $incomingMpesaPaymentId === null
+                                    ? 'pending'
+                                    : ($paymentData['status'] ?? 'completed')
+                            ),
                     ]);
 
                     if ($payment->method === 'credit_deni') {
@@ -407,6 +433,33 @@ class POSApiController extends Controller
             return response()->json([
                 'message' => $exception->getMessage(),
             ], 422);
+        } catch (QueryException $exception) {
+            if (
+                $clientCheckoutId !== null
+                && str_contains(strtolower($exception->getMessage()), 'sales_user_id_client_checkout_id_unique')
+            ) {
+                $existingSale = Sale::query()
+                    ->where('user_id', $cashierId)
+                    ->where('client_checkout_id', $clientCheckoutId)
+                    ->with(['customer', 'saleItems.product.taxCategory', 'payments'])
+                    ->first();
+
+                if ($existingSale !== null) {
+                    return response()->json([
+                        'message' => 'Checkout already processed.',
+                        'receipt_number' => $existingSale->receipt_number,
+                        'sale' => $existingSale,
+                        'pricing_adjustments' => [],
+                        'receipt_payload' => app(ReceiptPrinterService::class)->generateReceiptPayload($existingSale),
+                    ]);
+                }
+            }
+
+            report($exception);
+
+            return response()->json([
+                'message' => 'Checkout failed.',
+            ], 500);
         } catch (Throwable $exception) {
             report($exception);
 
@@ -518,37 +571,28 @@ class POSApiController extends Controller
         ]);
 
         try {
-            $payment = DB::transaction(function () use ($validated): Payment {
-                $paymentQuery = Payment::query()
-                    ->where('method', 'mpesa')
-                    ->where('status', 'pending')
-                    ->with('sale')
-                    ->lockForUpdate();
+            $paymentQuery = Payment::query()
+                ->where('method', 'mpesa')
+                ->with('sale');
 
-                if (! empty($validated['receipt_number'])) {
-                    $paymentQuery->whereHas('sale', function ($builder) use ($validated) {
-                        $builder->where('receipt_number', $validated['receipt_number']);
-                    });
-                }
+            if (! empty($validated['receipt_number'])) {
+                $paymentQuery->whereHas('sale', function ($builder) use ($validated) {
+                    $builder->where('receipt_number', $validated['receipt_number']);
+                });
+            }
 
-                if (! empty($validated['CheckoutRequestID'])) {
-                    $paymentQuery->where('reference_number', $validated['CheckoutRequestID']);
-                }
+            if (! empty($validated['CheckoutRequestID'])) {
+                $paymentQuery->where('reference_number', $validated['CheckoutRequestID']);
+            }
 
-                /** @var Payment|null $payment */
-                $payment = $paymentQuery->first();
+            /** @var Payment|null $payment */
+            $payment = $paymentQuery
+                ->orderByDesc('created_at')
+                ->first();
 
-                if ($payment === null) {
-                    throw new RuntimeException('No pending M-PESA transaction found for the provided reference.');
-                }
-
-                // This simulates a successful Daraja status lookup for the fallback path.
-                $payment->update([
-                    'status' => 'completed',
-                ]);
-
-                return $payment->fresh('sale');
-            });
+            if ($payment === null) {
+                throw new RuntimeException('No M-PESA transaction found for the provided reference.');
+            }
         } catch (RuntimeException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
@@ -562,7 +606,7 @@ class POSApiController extends Controller
         }
 
         return response()->json([
-            'message' => 'M-PESA transaction verified successfully.',
+            'message' => 'M-PESA transaction status retrieved successfully.',
             'payment' => $payment,
             'sale' => $payment->sale,
         ]);
@@ -585,7 +629,10 @@ class POSApiController extends Controller
         ]);
     }
 
-    private function expiresWithin48Hours(CarbonInterface|string|null $batchExpiryDate): bool
+    private function expiresWithin48Hours(
+        CarbonInterface|string|null $batchExpiryDate,
+        int $windowHours,
+    ): bool
     {
         if ($batchExpiryDate === null) {
             return false;
@@ -595,7 +642,7 @@ class POSApiController extends Controller
             ? $batchExpiryDate->copy()
             : Carbon::parse($batchExpiryDate);
 
-        return $expiryDate->isFuture() && $expiryDate->lte(now()->addHours(48)->endOfDay());
+        return $expiryDate->isFuture() && $expiryDate->lte(now()->addHours($windowHours)->endOfDay());
     }
 
     private function daysSinceLastReceived(CarbonInterface|string|null $lastReceivedDate): int
@@ -755,5 +802,78 @@ class POSApiController extends Controller
             'is_suspected_duplicate' => false,
             'reason' => null,
         ];
+    }
+
+    private function pricingRules(): array
+    {
+        $config = config('pos.pricing');
+
+        $stockAgeMidDays = max(
+            1,
+            SystemSetting::integer('pricing_stock_age_mid_days', (int) ($config['stock_age_mid_days'] ?? 90))
+        );
+        $stockAgeOldDays = max(
+            $stockAgeMidDays + 1,
+            SystemSetting::integer('pricing_stock_age_old_days', (int) ($config['stock_age_old_days'] ?? 120))
+        );
+
+        return [
+            'expiry_markdown_hours' => max(
+                1,
+                SystemSetting::integer('pricing_expiry_markdown_hours', (int) ($config['expiry_markdown_hours'] ?? 48))
+            ),
+            'expiry_markdown_percentage' => min(
+                95,
+                max(0, SystemSetting::decimal('pricing_expiry_markdown_percentage', (float) ($config['expiry_markdown_percentage'] ?? 50)))
+            ),
+            'stock_age_mid_days' => $stockAgeMidDays,
+            'stock_age_old_days' => $stockAgeOldDays,
+            'margin_multiplier_fresh' => max(
+                0.01,
+                SystemSetting::decimal('pricing_margin_multiplier_fresh', (float) ($config['margin_multiplier_fresh'] ?? 1.15))
+            ),
+            'margin_multiplier_mid' => max(
+                0.01,
+                SystemSetting::decimal('pricing_margin_multiplier_mid', (float) ($config['margin_multiplier_mid'] ?? 1.05))
+            ),
+            'margin_multiplier_old' => max(
+                0.01,
+                SystemSetting::decimal('pricing_margin_multiplier_old', (float) ($config['margin_multiplier_old'] ?? 1.00))
+            ),
+        ];
+    }
+
+    private function validateClaimedIncomingPayment(
+        array $validated,
+        IncomingMpesaPayment $claimedIncomingPayment,
+        float $grandTotal,
+        ?Customer $customer,
+    ): void {
+        if (round((float) $claimedIncomingPayment->amount, 2) !== round($grandTotal, 2)) {
+            throw new RuntimeException('Claimed M-PESA amount must exactly match the sale total.');
+        }
+
+        $claimPhone = $claimedIncomingPayment->phone_number_normalized;
+
+        if ($claimPhone === null) {
+            throw new RuntimeException('Claimed M-PESA payment has no normalized phone number and cannot be attached.');
+        }
+
+        $suffix = (string) ($validated['claim_phone_suffix'] ?? '');
+
+        if ($suffix === '' || substr($claimPhone, -4) !== $suffix) {
+            throw new RuntimeException('Claimed M-PESA payment requires a matching 4-digit phone suffix confirmation.');
+        }
+
+        $customerPhone = $customer?->phone_normalized
+            ?? Customer::normalizePhone($validated['customer_phone'] ?? null);
+
+        if ($customerPhone !== null && $customerPhone !== $claimPhone) {
+            throw new RuntimeException('Claimed M-PESA payment phone does not match the selected customer.');
+        }
+
+        if ($customerPhone === null) {
+            throw new RuntimeException('Claimed M-PESA payment requires a matching customer phone for association.');
+        }
     }
 }

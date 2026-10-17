@@ -17,6 +17,8 @@ class Payment extends Model
         return [
             'amount' => 'decimal:2',
             'phone_number' => 'encrypted',
+            'provider_payload' => 'array',
+            'provider_confirmed_at' => 'datetime',
         ];
     }
 

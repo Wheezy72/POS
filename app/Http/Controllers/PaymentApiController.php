@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Models\IncomingMpesaPayment;
+use App\Models\Payment;
+use App\Models\Sale;
 use App\Services\PaymentGatewayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
@@ -155,6 +158,102 @@ class PaymentApiController extends Controller
         return response()->json([
             'message' => 'STK status retrieved successfully.',
             'status' => $status,
+        ]);
+    }
+
+    public function receiveStkCallback(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+        $stkCallback = data_get($payload, 'Body.stkCallback', []);
+
+        $validated = validator($stkCallback, [
+            'CheckoutRequestID' => ['required', 'string', 'max:255'],
+            'ResultCode' => ['required'],
+            'ResultDesc' => ['nullable', 'string', 'max:255'],
+            'CallbackMetadata' => ['nullable', 'array'],
+            'CallbackMetadata.Item' => ['nullable', 'array'],
+        ])->validate();
+
+        $metadata = collect((array) data_get($validated, 'CallbackMetadata.Item', []))
+            ->filter(fn (mixed $item): bool => is_array($item) && array_key_exists('Name', $item))
+            ->mapWithKeys(fn (array $item): array => [(string) $item['Name'] => $item['Value'] ?? null])
+            ->all();
+
+        try {
+            DB::transaction(function () use ($validated, $metadata, $payload): void {
+                /** @var Payment|null $payment */
+                $payment = Payment::query()
+                    ->where('method', 'mpesa')
+                    ->where('reference_number', $validated['CheckoutRequestID'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($payment === null) {
+                    throw new RuntimeException('No matching pending STK payment found.');
+                }
+
+                $resultCode = (string) $validated['ResultCode'];
+                $isSuccess = $resultCode === '0';
+                $nextStatus = $isSuccess ? 'completed' : 'failed';
+
+                if ($payment->status === $nextStatus && $payment->provider_status_code === $resultCode) {
+                    return;
+                }
+
+                if ($payment->status !== 'pending' && $payment->status !== $nextStatus) {
+                    return;
+                }
+
+                $payment->update([
+                    'status' => $nextStatus,
+                    'provider_reference' => (string) ($metadata['MpesaReceiptNumber'] ?? $payment->provider_reference),
+                    'provider_status_code' => $resultCode,
+                    'provider_status_description' => $validated['ResultDesc'] ?? null,
+                    'provider_payload' => $payload,
+                    'provider_confirmed_at' => now(),
+                ]);
+
+                /** @var Sale|null $sale */
+                $sale = Sale::query()
+                    ->whereKey($payment->sale_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($sale === null) {
+                    return;
+                }
+
+                $hasPendingPayments = Payment::query()
+                    ->where('sale_id', $sale->id)
+                    ->where('status', 'pending')
+                    ->exists();
+
+                if (! $hasPendingPayments && $isSuccess) {
+                    $sale->update(['status' => 'completed']);
+                }
+            });
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'ResultCode' => 1,
+                'ResultDesc' => $exception->getMessage(),
+            ], 404);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'ResultCode' => 1,
+                'ResultDesc' => 'Unable to process callback.',
+            ], 500);
+        }
+
+        Log::info('M-PESA STK callback processed.', [
+            'checkout_request_id' => $validated['CheckoutRequestID'],
+            'result_code' => (string) $validated['ResultCode'],
+        ]);
+
+        return response()->json([
+            'ResultCode' => 0,
+            'ResultDesc' => 'Accepted',
         ]);
     }
 }

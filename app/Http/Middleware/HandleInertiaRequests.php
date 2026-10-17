@@ -32,6 +32,13 @@ class HandleInertiaRequests extends Middleware
             ],
             'csrfToken' => csrf_token(),
             'settings' => SystemSetting::featureFlags(),
+            'posRuntime' => [
+                'printerProxyEnabled' => (bool) config('pos.printer.proxy_enabled', false),
+                'clockRejectDriftSeconds' => SystemSetting::integer(
+                    'pos_clock_reject_drift_seconds',
+                    (int) config('pos.clock.reject_drift_seconds', 300)
+                ),
+            ],
         ];
     }
 }

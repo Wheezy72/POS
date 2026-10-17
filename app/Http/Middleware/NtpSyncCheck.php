@@ -2,8 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SystemSetting;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 class NtpSyncCheck
@@ -16,36 +19,57 @@ class NtpSyncCheck
     public function handle(Request $request, Closure $next): Response
     {
         $clientTime = $request->header('X-Terminal-Time'); // Expect ISO8601 or Timestamp
+        $serverDate = now();
+        $warnThreshold = max(
+            1,
+            SystemSetting::integer('pos_clock_warn_drift_seconds', (int) config('pos.clock.warn_drift_seconds', 30))
+        );
+        $rejectThreshold = max(
+            $warnThreshold + 1,
+            SystemSetting::integer('pos_clock_reject_drift_seconds', (int) config('pos.clock.reject_drift_seconds', 300))
+        );
+        $drift = null;
 
-        if (!$clientTime) {
-            return $next($request);
-        }
+        if ($clientTime) {
+            try {
+                $clientDate = Carbon::parse($clientTime);
+                $drift = abs($serverDate->diffInSeconds($clientDate, false));
 
-        try {
-            $clientDate = \Illuminate\Support\Carbon::parse($clientTime);
-            $serverDate = now();
+                if ($drift > $warnThreshold) {
+                    Log::warning('POS Terminal Clock Drift Detected', [
+                        'client_time' => $clientTime,
+                        'server_time' => $serverDate->toIso8601String(),
+                        'drift_seconds' => $drift,
+                        'warn_threshold_seconds' => $warnThreshold,
+                        'reject_threshold_seconds' => $rejectThreshold,
+                        'ip' => $request->ip(),
+                    ]);
+                }
 
-            $drift = abs($serverDate->diffInSeconds($clientDate, false));
-
-            if ($drift > 5) {
-                \Illuminate\Support\Facades\Log::warning('POS Terminal Clock Drift Detected', [
-                    'client_time' => $clientTime,
-                    'server_time' => $serverDate->toIso8601String(),
-                    'drift_seconds' => $drift,
-                    'ip' => $request->ip(),
-                ]);
-
-                return response()->json([
-                    'error' => 'CLOCK_DRIFT',
-                    'message' => 'Terminal clock is out of sync with the server. Please synchronize your system time.',
-                    'server_time' => $serverDate->toIso8601String(),
-                ], 403);
+                if ($drift > $rejectThreshold) {
+                    return response()->json([
+                        'error' => 'CLOCK_DRIFT',
+                        'message' => 'Terminal clock drift exceeded safe tolerance.',
+                        'server_time' => $serverDate->toIso8601String(),
+                        'drift_seconds' => $drift,
+                        'reject_threshold_seconds' => $rejectThreshold,
+                    ], 403)->withHeaders([
+                        'X-Server-Time' => $serverDate->toIso8601String(),
+                        'X-Terminal-Drift-Seconds' => (string) $drift,
+                    ]);
+                }
+            } catch (\Exception) {
+                Log::warning('Malformed X-Terminal-Time header', ['value' => $clientTime]);
             }
-        } catch (\Exception $e) {
-            // If parsing fails, we might want to log it but maybe not block if it's just a malformed header
-            \Illuminate\Support\Facades\Log::error('Malformed X-Terminal-Time header', ['value' => $clientTime]);
         }
 
-        return $next($request);
+        $response = $next($request);
+        $response->headers->set('X-Server-Time', $serverDate->toIso8601String());
+
+        if ($drift !== null) {
+            $response->headers->set('X-Terminal-Drift-Seconds', (string) $drift);
+        }
+
+        return $response;
     }
 }

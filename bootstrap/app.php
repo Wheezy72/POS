@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [
             'api/webhooks/mpesa/c2b',
+            'api/webhooks/mpesa/stk-callback',
         ]);
 
         $middleware->web(append: [
